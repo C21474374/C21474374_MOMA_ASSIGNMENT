@@ -1,4 +1,9 @@
 {
+  "scripts": {
+    "start": "node app.js",
+    "import:sample": "node scripts/import-sample-data.js",
+    "db:shell": "npx mongosh \"mongodb://127.0.0.1:27017/artapp\""
+  },
   "dependencies": {
     "cors": "^2.8.6",
     "dotenv": "^17.4.2",
