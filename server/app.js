@@ -13,8 +13,8 @@ app.get("/", (req, res) => {
   res.send("Hello World from Express!");
 });
 
-app.use("/artists", artistsRoutes);
-app.use("/artwork", artworkRoutes);
+app.use("/api/artists", artistsRoutes);
+app.use("/api/artwork", artworkRoutes);
 
 
 async function startServer() {
