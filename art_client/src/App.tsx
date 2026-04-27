@@ -1,15 +1,22 @@
 import { useEffect, useMemo, useState } from 'react'
+import HomePage from './pages/HomePage'
 import ArtistsPage from './pages/ArtistsPage'
 import ArtworkPage from './pages/ArtworkPage'
 
-type View = 'artists' | 'artwork'
+type View = 'home' | 'artists' | 'artwork'
 
 function parseViewFromHash(hash: string): View {
   const value = hash.replace(/^#\/?/, '').toLowerCase()
+  if (value === 'home') {
+    return 'home'
+  }
   if (value === 'artwork') {
     return 'artwork'
   }
-  return 'artists'
+  if (value === 'artists') {
+    return 'artists'
+  }
+  return 'home'
 }
 
 function App() {
@@ -17,7 +24,7 @@ function App() {
 
   useEffect(() => {
     if (!window.location.hash) {
-      window.location.hash = '/artists'
+      window.location.hash = '/home'
     }
 
     const onHashChange = () => {
@@ -31,6 +38,9 @@ function App() {
   }, [])
 
   const page = useMemo(() => {
+    if (view === 'home') {
+      return <HomePage />
+    }
     if (view === 'artwork') {
       return <ArtworkPage />
     }
@@ -38,23 +48,38 @@ function App() {
   }, [view])
 
   return (
-    <div className="app-shell">
+    <>
       <header className="top-nav">
-        <a
-          href="#/artists"
-          className={`nav-link ${view === 'artists' ? 'active' : ''}`}
-        >
-          Artists
-        </a>
-        <a
-          href="#/artwork"
-          className={`nav-link ${view === 'artwork' ? 'active' : ''}`}
-        >
-          Artwork
-        </a>
+        <div className="top-nav-inner">
+          <a href="#/home" className="nav-brand">
+            MoMA
+          </a>
+          <nav className="top-nav-links" aria-label="Primary">
+            <a
+              href="#/home"
+              className={`nav-link ${view === 'home' ? 'active' : ''}`}
+            >
+              Home
+            </a>
+            <a
+              href="#/artists"
+              className={`nav-link ${view === 'artists' ? 'active' : ''}`}
+            >
+              Artists
+            </a>
+            <a
+              href="#/artwork"
+              className={`nav-link ${view === 'artwork' ? 'active' : ''}`}
+            >
+              Artwork
+            </a>
+          </nav>
+        </div>
       </header>
-      <main>{page}</main>
-    </div>
+      <div className="app-shell">
+        <main>{page}</main>
+      </div>
+    </>
   )
 }
 
