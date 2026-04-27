@@ -243,6 +243,9 @@ function ArtworkPage() {
 
           return value !== null && value !== undefined && value !== ''
         })
+  const isSelectedArtworkLiked = selectedArtwork
+    ? likedArtworkIds.has(selectedArtwork._id)
+    : false
 
   return (
     <section>
@@ -313,33 +316,61 @@ function ArtworkPage() {
         onClose={closeDetails}
       >
         {selectedArtwork && (
-          <div className="modal-content">
-            <section className="modal-section">
-              <h3 className="modal-section-title">Artwork Information</h3>
-              <div className="modal-info-grid">
-                <ArtworkInfoRow label="Title" value={selectedArtwork.Title} />
-                <ArtworkInfoRow
-                  label="Artist"
-                  value={getArtistLabel(selectedArtwork.Artist)}
-                />
-                <ArtworkInfoRow label="Date" value={selectedArtwork.Date} />
-                <ArtworkInfoRow label="Medium" value={selectedArtwork.Medium} />
-                <ArtworkInfoRow
-                  label="Classification"
-                  value={selectedArtwork.Classification}
-                />
-                <ArtworkInfoRow
-                  label="Department"
-                  value={selectedArtwork.Department}
-                />
-                <ArtworkInfoRow
-                  label="Accession Number"
-                  value={selectedArtwork.AccessionNumber}
-                />
-                <ArtworkInfoRow label="Object ID" value={selectedArtwork.ObjectID} />
-                <ArtworkInfoRow label="Likes" value={selectedArtwork.Likes ?? 0} />
-              </div>
-            </section>
+          <div className="modal-content artwork-modal-layout">
+            <div className="artwork-main-grid">
+              <section className="modal-section modal-section-with-like">
+                <h3 className="modal-section-title">Artwork Information</h3>
+                <div className="modal-info-grid">
+                  <ArtworkInfoRow label="Title" value={selectedArtwork.Title} />
+                  <ArtworkInfoRow
+                    label="Artist"
+                    value={getArtistLabel(selectedArtwork.Artist)}
+                  />
+                  <ArtworkInfoRow label="Date" value={selectedArtwork.Date} />
+                  <ArtworkInfoRow label="Medium" value={selectedArtwork.Medium} />
+                  <ArtworkInfoRow
+                    label="Classification"
+                    value={selectedArtwork.Classification}
+                  />
+                  <ArtworkInfoRow
+                    label="Department"
+                    value={selectedArtwork.Department}
+                  />
+                  <ArtworkInfoRow
+                    label="Accession Number"
+                    value={selectedArtwork.AccessionNumber}
+                  />
+                  <ArtworkInfoRow label="Object ID" value={selectedArtwork.ObjectID} />
+                  <ArtworkInfoRow label="Likes" value={selectedArtwork.Likes ?? 0} />
+                </div>
+                <button
+                  type="button"
+                  className={`modal-section-like-btn ${
+                    isSelectedArtworkLiked ? 'liked' : ''
+                  }`}
+                  onClick={(event) => handleLike(event, selectedArtwork)}
+                  aria-label={`${
+                    isSelectedArtworkLiked ? 'Unlike' : 'Like'
+                  } ${selectedArtwork.Title || 'artwork'}`}
+                  title={isSelectedArtworkLiked ? 'Unlike' : 'Like'}
+                >
+                  {isSelectedArtworkLiked ? '\u2665' : '\u2661'}
+                </button>
+              </section>
+
+              <section className="modal-section artwork-image-section">
+                <h3 className="modal-section-title">Artwork Image</h3>
+                {selectedArtwork.ImageURL ? (
+                  <img
+                    src={selectedArtwork.ImageURL}
+                    alt={selectedArtwork.Title || 'Artwork image'}
+                    className="modal-artwork-image"
+                  />
+                ) : (
+                  <div className="modal-artwork-image-empty">No image available</div>
+                )}
+              </section>
+            </div>
 
             <section className="modal-section">
               <h3 className="modal-section-title">Dimensions & Gallery Status</h3>

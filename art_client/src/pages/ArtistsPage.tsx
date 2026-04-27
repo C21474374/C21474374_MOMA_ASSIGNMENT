@@ -26,6 +26,25 @@ type ArtworkSummary = {
   Date?: string
   Artist?: string[] | string
   ConstituentID?: number[] | number
+  ArtistBio?: string[] | string
+  BeginDate?: number[] | number
+  EndDate?: number[] | number
+  Nationality?: string[] | string
+  Gender?: string[] | string
+  Medium?: string
+  Classification?: string
+  Department?: string
+  Dimensions?: string
+  ['Height (cm)']?: number
+  ['Width (cm)']?: number
+  ['Depth (cm)']?: number
+  CreditLine?: string
+  AccessionNumber?: string
+  DateAcquired?: string
+  Cataloged?: string
+  ObjectID?: number
+  URL?: string
+  OnView?: string
   ImageURL?: string
   Likes?: number
   [key: string]: unknown
@@ -42,6 +61,16 @@ function asDisplayValue(value: unknown) {
     return value.join(', ')
   }
   return String(value)
+}
+
+function getArtistLabel(artist: ArtworkSummary['Artist']) {
+  if (Array.isArray(artist)) {
+    return artist.filter(Boolean).join(', ')
+  }
+  if (typeof artist === 'string') {
+    return artist
+  }
+  return 'Unknown artist'
 }
 
 function ArtistInfoRow({
@@ -102,6 +131,12 @@ function ArtistsPage() {
   const [selectedArtist, setSelectedArtist] = useState<Artist | null>(null)
   const [detailsLoading, setDetailsLoading] = useState(false)
   const [relatedArtwork, setRelatedArtwork] = useState<ArtworkSummary[]>([])
+  const [selectedRelatedArtwork, setSelectedRelatedArtwork] =
+    useState<ArtworkSummary | null>(null)
+  const [relatedDetailsLoading, setRelatedDetailsLoading] = useState(false)
+  const [likedRelatedArtworkIds, setLikedRelatedArtworkIds] = useState<Set<string>>(
+    new Set()
+  )
   const [relatedLoading, setRelatedLoading] = useState(false)
   const [carouselPage, setCarouselPage] = useState(0)
   const [loading, setLoading] = useState(true)
@@ -151,16 +186,20 @@ function ArtistsPage() {
 
   const closeDetails = () => {
     setSelectedArtist(null)
+    setSelectedRelatedArtwork(null)
     setDetailsLoading(false)
     setRelatedLoading(false)
+    setRelatedDetailsLoading(false)
     setRelatedArtwork([])
     setCarouselPage(0)
   }
 
   const openArtistDetails = async (artist: Artist) => {
     setSelectedArtist(artist)
+    setSelectedRelatedArtwork(null)
     setDetailsLoading(true)
     setRelatedLoading(true)
+    setRelatedDetailsLoading(false)
     setRelatedArtwork([])
     setCarouselPage(0)
 
@@ -207,6 +246,33 @@ function ArtistsPage() {
     } finally {
       setRelatedLoading(false)
     }
+  }
+
+  const openRelatedArtworkDetails = async (item: ArtworkSummary) => {
+    setSelectedRelatedArtwork(item)
+    setRelatedDetailsLoading(true)
+
+    try {
+      const response = await fetch(`/api/artwork/${item._id}`)
+      if (!response.ok) {
+        throw new Error(`Request failed with status ${response.status}`)
+      }
+
+      const detailedArtwork = (await response.json()) as ArtworkSummary
+      setSelectedRelatedArtwork(detailedArtwork)
+      setRelatedArtwork((prev) =>
+        prev.map((art) => (art._id === item._id ? detailedArtwork : art))
+      )
+    } catch {
+      setSelectedRelatedArtwork(item)
+    } finally {
+      setRelatedDetailsLoading(false)
+    }
+  }
+
+  const goBackToArtistDetails = () => {
+    setSelectedRelatedArtwork(null)
+    setRelatedDetailsLoading(false)
   }
 
   const handleLike = async (event: MouseEvent<HTMLButtonElement>, artist: Artist) => {
@@ -274,6 +340,72 @@ function ArtistsPage() {
     }
   }
 
+  const handleRelatedArtworkLike = async (
+    event: MouseEvent<HTMLButtonElement>,
+    item: ArtworkSummary
+  ) => {
+    event.stopPropagation()
+
+    const isCurrentlyLiked = likedRelatedArtworkIds.has(item._id)
+    const currentLikes = Math.max(0, Number(item.Likes ?? 0))
+    const nextLikes = Math.max(0, currentLikes + (isCurrentlyLiked ? -1 : 1))
+
+    setLikedRelatedArtworkIds((prev) => {
+      const next = new Set(prev)
+      if (isCurrentlyLiked) {
+        next.delete(item._id)
+      } else {
+        next.add(item._id)
+      }
+      return next
+    })
+
+    setRelatedArtwork((prev) =>
+      prev.map((art) => (art._id === item._id ? { ...art, Likes: nextLikes } : art))
+    )
+    setSelectedRelatedArtwork((prev) =>
+      prev && prev._id === item._id ? { ...prev, Likes: nextLikes } : prev
+    )
+
+    try {
+      const response = await fetch(`/api/artwork/${item._id}`, {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ Likes: nextLikes }),
+      })
+
+      if (!response.ok) {
+        throw new Error(`Request failed with status ${response.status}`)
+      }
+
+      const updatedArtwork = (await response.json()) as ArtworkSummary
+      setRelatedArtwork((prev) =>
+        prev.map((art) => (art._id === item._id ? updatedArtwork : art))
+      )
+      setSelectedRelatedArtwork((prev) =>
+        prev && prev._id === item._id ? updatedArtwork : prev
+      )
+    } catch {
+      setLikedRelatedArtworkIds((prev) => {
+        const next = new Set(prev)
+        if (isCurrentlyLiked) {
+          next.add(item._id)
+        } else {
+          next.delete(item._id)
+        }
+        return next
+      })
+      setRelatedArtwork((prev) =>
+        prev.map((art) =>
+          art._id === item._id ? { ...art, Likes: currentLikes } : art
+        )
+      )
+      setSelectedRelatedArtwork((prev) =>
+        prev && prev._id === item._id ? { ...prev, Likes: currentLikes } : prev
+      )
+    }
+  }
+
   const carouselMaxPage = useMemo(() => {
     if (relatedArtwork.length === 0) {
       return 0
@@ -318,6 +450,46 @@ function ArtistsPage() {
 
           return value !== null && value !== undefined && value !== ''
         })
+
+  const extraRelatedArtworkFields =
+    selectedRelatedArtwork === null
+      ? []
+      : Object.entries(selectedRelatedArtwork).filter(([key, value]) => {
+          const hiddenKeys = new Set([
+            '_id',
+            'Title',
+            'Artist',
+            'Date',
+            'Medium',
+            'Classification',
+            'Department',
+            'Dimensions',
+            'Height (cm)',
+            'Width (cm)',
+            'Depth (cm)',
+            'CreditLine',
+            'AccessionNumber',
+            'DateAcquired',
+            'Cataloged',
+            'ObjectID',
+            'URL',
+            'ImageURL',
+            'OnView',
+            'Likes',
+          ])
+
+          if (hiddenKeys.has(key)) {
+            return false
+          }
+
+          return value !== null && value !== undefined && value !== ''
+        })
+  const isSelectedArtistLiked = selectedArtist
+    ? likedArtistIds.has(selectedArtist._id)
+    : false
+  const isSelectedRelatedArtworkLiked = selectedRelatedArtwork
+    ? likedRelatedArtworkIds.has(selectedRelatedArtwork._id)
+    : false
 
   return (
     <section>
@@ -376,14 +548,173 @@ function ArtistsPage() {
         </button>
       )}
       <DetailsModal
-        title={selectedArtist?.DisplayName || 'Artist'}
-        item={selectedArtist}
-        loading={detailsLoading}
+        title={selectedRelatedArtwork?.Title || selectedArtist?.DisplayName || 'Artist'}
+        item={selectedRelatedArtwork || selectedArtist}
+        loading={selectedRelatedArtwork ? relatedDetailsLoading : detailsLoading}
+        onBack={selectedRelatedArtwork ? goBackToArtistDetails : undefined}
+        backLabel="Back to artist"
         onClose={closeDetails}
       >
-        {selectedArtist && (
-          <div className="modal-content">
+        {selectedRelatedArtwork ? (
+          <div className="modal-content artwork-modal-layout">
+            <div className="artwork-main-grid">
+              <section className="modal-section modal-section-with-like">
+                <h3 className="modal-section-title">Artwork Information</h3>
+                <div className="modal-info-grid">
+                  <ArtistInfoRow label="Title" value={selectedRelatedArtwork.Title} />
+                  <ArtistInfoRow
+                    label="Artist"
+                    value={getArtistLabel(selectedRelatedArtwork.Artist)}
+                  />
+                  <ArtistInfoRow label="Date" value={selectedRelatedArtwork.Date} />
+                  <ArtistInfoRow label="Medium" value={selectedRelatedArtwork.Medium} />
+                  <ArtistInfoRow
+                    label="Classification"
+                    value={selectedRelatedArtwork.Classification}
+                  />
+                  <ArtistInfoRow
+                    label="Department"
+                    value={selectedRelatedArtwork.Department}
+                  />
+                  <ArtistInfoRow
+                    label="Accession Number"
+                    value={selectedRelatedArtwork.AccessionNumber}
+                  />
+                  <ArtistInfoRow
+                    label="Object ID"
+                    value={selectedRelatedArtwork.ObjectID}
+                  />
+                  <ArtistInfoRow
+                    label="Likes"
+                    value={selectedRelatedArtwork.Likes ?? 0}
+                  />
+                </div>
+                <button
+                  type="button"
+                  className={`modal-section-like-btn ${
+                    isSelectedRelatedArtworkLiked ? 'liked' : ''
+                  }`}
+                  onClick={(event) =>
+                    handleRelatedArtworkLike(event, selectedRelatedArtwork)
+                  }
+                  aria-label={`${
+                    isSelectedRelatedArtworkLiked ? 'Unlike' : 'Like'
+                  } ${selectedRelatedArtwork.Title || 'artwork'}`}
+                  title={isSelectedRelatedArtworkLiked ? 'Unlike' : 'Like'}
+                >
+                  {isSelectedRelatedArtworkLiked ? '\u2665' : '\u2661'}
+                </button>
+              </section>
+
+              <section className="modal-section artwork-image-section">
+                <h3 className="modal-section-title">Artwork Image</h3>
+                {selectedRelatedArtwork.ImageURL ? (
+                  <img
+                    src={selectedRelatedArtwork.ImageURL}
+                    alt={selectedRelatedArtwork.Title || 'Artwork image'}
+                    className="modal-artwork-image"
+                  />
+                ) : (
+                  <div className="modal-artwork-image-empty">No image available</div>
+                )}
+              </section>
+            </div>
+
             <section className="modal-section">
+              <h3 className="modal-section-title">Dimensions & Gallery Status</h3>
+              <div className="modal-info-grid">
+                <ArtistInfoRow
+                  label="Dimensions"
+                  value={selectedRelatedArtwork.Dimensions}
+                />
+                <ArtistInfoRow
+                  label="Height (cm)"
+                  value={selectedRelatedArtwork['Height (cm)']}
+                />
+                <ArtistInfoRow
+                  label="Width (cm)"
+                  value={selectedRelatedArtwork['Width (cm)']}
+                />
+                <ArtistInfoRow
+                  label="Depth (cm)"
+                  value={selectedRelatedArtwork['Depth (cm)']}
+                />
+                <ArtistInfoRow label="On View" value={selectedRelatedArtwork.OnView} />
+                <ArtistInfoRow
+                  label="Date Acquired"
+                  value={selectedRelatedArtwork.DateAcquired}
+                />
+                <ArtistInfoRow
+                  label="Cataloged"
+                  value={selectedRelatedArtwork.Cataloged}
+                />
+              </div>
+              <p className="modal-bio">
+                <span className="modal-info-label">Credit Line:</span>{' '}
+                {asDisplayValue(selectedRelatedArtwork.CreditLine)}
+              </p>
+            </section>
+
+            <section className="modal-section">
+              <h3 className="modal-section-title">Links</h3>
+              <div className="modal-info-grid">
+                <div className="modal-info-row">
+                  <span className="modal-info-label">Artwork URL</span>
+                  <span className="modal-info-value">
+                    {typeof selectedRelatedArtwork.URL === 'string' &&
+                    selectedRelatedArtwork.URL ? (
+                      <a
+                        href={selectedRelatedArtwork.URL}
+                        target="_blank"
+                        rel="noreferrer"
+                        className="modal-link"
+                      >
+                        Open artwork link
+                      </a>
+                    ) : (
+                      'N/A'
+                    )}
+                  </span>
+                </div>
+                <div className="modal-info-row">
+                  <span className="modal-info-label">Image URL</span>
+                  <span className="modal-info-value">
+                    {typeof selectedRelatedArtwork.ImageURL === 'string' &&
+                    selectedRelatedArtwork.ImageURL ? (
+                      <a
+                        href={selectedRelatedArtwork.ImageURL}
+                        target="_blank"
+                        rel="noreferrer"
+                        className="modal-link"
+                      >
+                        Open image link
+                      </a>
+                    ) : (
+                      'N/A'
+                    )}
+                  </span>
+                </div>
+              </div>
+            </section>
+
+            {extraRelatedArtworkFields.length > 0 && (
+              <section className="modal-section">
+                <h3 className="modal-section-title">Additional Details</h3>
+                <div className="details-list">
+                  {extraRelatedArtworkFields.map(([key, value]) => (
+                    <div className="details-row" key={key}>
+                      <div className="details-key">{key}</div>
+                      <div className="details-value">{asDisplayValue(value)}</div>
+                    </div>
+                  ))}
+                </div>
+              </section>
+            )}
+          </div>
+        ) : (
+          selectedArtist && (
+          <div className="modal-content">
+            <section className="modal-section modal-section-with-like">
               <h3 className="modal-section-title">Artist Information</h3>
               <div className="modal-info-grid">
                 <ArtistInfoRow label="Name" value={selectedArtist.DisplayName} />
@@ -404,6 +735,19 @@ function ArtistsPage() {
                 />
                 <ArtistInfoRow label="Likes" value={selectedArtist.Likes ?? 0} />
               </div>
+              <button
+                type="button"
+                className={`modal-section-like-btn ${
+                  isSelectedArtistLiked ? 'liked' : ''
+                }`}
+                onClick={(event) => handleLike(event, selectedArtist)}
+                aria-label={`${
+                  isSelectedArtistLiked ? 'Unlike' : 'Like'
+                } ${selectedArtist.DisplayName || 'artist'}`}
+                title={isSelectedArtistLiked ? 'Unlike' : 'Like'}
+              >
+                {isSelectedArtistLiked ? '\u2665' : '\u2661'}
+              </button>
               <p className="modal-bio">
                 <span className="modal-info-label">Biography:</span>{' '}
                 {asDisplayValue(selectedArtist.ArtistBio)}
@@ -452,25 +796,53 @@ function ArtistsPage() {
                     </button>
                   </div>
                   <div className="carousel-grid">
-                    {carouselItems.map((item) => (
-                      <article className="carousel-card" key={item._id}>
+                    {carouselItems.map((item) => {
+                      const isLiked = likedRelatedArtworkIds.has(item._id)
+
+                      return (
+                      <article
+                        className="card"
+                        key={item._id}
+                        onClick={() => openRelatedArtworkDetails(item)}
+                        role="button"
+                        tabIndex={0}
+                        onKeyDown={(event) => {
+                          if (event.key === 'Enter' || event.key === ' ') {
+                            event.preventDefault()
+                            openRelatedArtworkDetails(item)
+                          }
+                        }}
+                      >
                         {item.ImageURL ? (
                           <img
                             src={item.ImageURL}
                             alt={item.Title || 'Artwork'}
-                            className="carousel-image"
+                            className="card-image"
                             loading="lazy"
                           />
                         ) : (
-                          <div className="carousel-image carousel-image-empty">
+                          <div className="card-image card-image-empty">
                             No image
                           </div>
                         )}
-                        <h4 className="carousel-title">{item.Title || 'Untitled'}</h4>
-                        <p className="carousel-meta">{item.Date || 'Unknown date'}</p>
-                        <p className="carousel-meta">Likes: {item.Likes ?? 0}</p>
+                        <h4 className="card-title">{item.Title || 'Untitled'}</h4>
+                        <p className="card-meta">{getArtistLabel(item.Artist)}</p>
+                        <p className="card-meta">{item.Date || 'Unknown date'}</p>
+                        <p className="card-likes">Likes: {item.Likes ?? 0}</p>
+                        <button
+                          type="button"
+                          className={`card-heart-btn ${isLiked ? 'liked' : ''}`}
+                          onClick={(event) => handleRelatedArtworkLike(event, item)}
+                          aria-label={`${isLiked ? 'Unlike' : 'Like'} ${
+                            item.Title || 'artwork'
+                          }`}
+                          title={isLiked ? 'Unlike' : 'Like'}
+                        >
+                          {isLiked ? '\u2665' : '\u2661'}
+                        </button>
                       </article>
-                    ))}
+                      )
+                    })}
                   </div>
                 </div>
               )}
@@ -490,6 +862,7 @@ function ArtistsPage() {
               </section>
             )}
           </div>
+          )
         )}
       </DetailsModal>
     </section>

@@ -4,6 +4,8 @@ type DetailsModalProps = {
   title: string
   item: Record<string, unknown> | null
   loading?: boolean
+  onBack?: () => void
+  backLabel?: string
   children?: ReactNode
   onClose: () => void
 }
@@ -37,6 +39,8 @@ function DetailsModal({
   title,
   item,
   loading = false,
+  onBack,
+  backLabel = 'Back',
   children,
   onClose,
 }: DetailsModalProps) {
@@ -72,9 +76,55 @@ function DetailsModal({
       >
         <div className="modal-header">
           <h2 className="modal-title">{title}</h2>
-          <button type="button" className="modal-close" onClick={onClose}>
-            Close
-          </button>
+          <div className="modal-actions">
+            {onBack && (
+              <button
+                type="button"
+                className="modal-icon-btn modal-back"
+                onClick={onBack}
+                aria-label={backLabel}
+                title={backLabel}
+              >
+                <svg
+                  viewBox="0 0 24 24"
+                  className="modal-icon"
+                  aria-hidden="true"
+                  focusable="false"
+                >
+                  <path
+                    d="M14.5 5.5L8 12l6.5 6.5"
+                    fill="none"
+                    stroke="currentColor"
+                    strokeWidth="2.2"
+                    strokeLinecap="round"
+                    strokeLinejoin="round"
+                  />
+                </svg>
+              </button>
+            )}
+            <button
+              type="button"
+              className="modal-icon-btn modal-close"
+              onClick={onClose}
+              aria-label="Close details"
+              title="Close"
+            >
+              <svg
+                viewBox="0 0 24 24"
+                className="modal-icon"
+                aria-hidden="true"
+                focusable="false"
+              >
+                <path
+                  d="M6 6l12 12M18 6L6 18"
+                  fill="none"
+                  stroke="currentColor"
+                  strokeWidth="2.2"
+                  strokeLinecap="round"
+                />
+              </svg>
+            </button>
+          </div>
         </div>
         {loading ? (
           <p className="modal-status">Loading full details...</p>

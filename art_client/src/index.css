@@ -186,7 +186,13 @@ body {
   align-items: center;
   justify-content: space-between;
   gap: 12px;
-  margin-bottom: 12px;
+  position: sticky;
+  top: -14px;
+  z-index: 10;
+  margin: -14px -14px 12px;
+  padding: 14px;
+  background: #ffffff;
+  border-bottom: 1px solid #000000;
 }
 
 .modal-title {
@@ -195,12 +201,33 @@ body {
   font-weight: 800;
 }
 
-.modal-close {
+.modal-actions {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.modal-icon-btn {
   border: 1px solid #000000;
   background: #ffffff;
   color: #000000;
-  padding: 8px 12px;
+  width: 38px;
+  height: 38px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  padding: 0;
   cursor: pointer;
+}
+
+.modal-icon {
+  width: 18px;
+  height: 18px;
+}
+
+.modal-icon-btn:hover {
+  background: #000000;
+  color: #ffffff;
 }
 
 .modal-status {
@@ -215,9 +242,79 @@ body {
   gap: 18px;
 }
 
+.artwork-main-grid {
+  display: grid;
+  grid-template-columns: minmax(0, 1.2fr) minmax(260px, 0.8fr);
+  gap: 18px;
+  align-items: start;
+}
+
+.artwork-image-section {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+.modal-artwork-image {
+  width: 100%;
+  max-height: 420px;
+  object-fit: contain;
+  display: block;
+  border: 1px solid #000000;
+  background: #f7f7f7;
+}
+
+.modal-artwork-image-empty {
+  min-height: 280px;
+  border: 1px solid #000000;
+  background: #ffffff;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 14px;
+  font-weight: 600;
+}
+
 .modal-section {
   border: 1px solid #000000;
   padding: 12px;
+}
+
+.modal-section-with-like {
+  position: relative;
+  padding-bottom: 56px;
+}
+
+.modal-section-like-btn {
+  position: absolute;
+  right: 12px;
+  bottom: 12px;
+  border: 1px solid #000000;
+  background: #ffffff;
+  color: #000000;
+  width: 34px;
+  height: 34px;
+  font-size: 19px;
+  font-weight: 700;
+  line-height: 1;
+  cursor: pointer;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.modal-section-like-btn:hover {
+  background: #f2f2f2;
+}
+
+.modal-section-like-btn.liked {
+  border-color: #c81d25;
+  color: #c81d25;
+  background: #fff4f4;
+}
+
+.modal-section-like-btn.liked:hover {
+  background: #ffe4e4;
 }
 
 .modal-section-title {
@@ -374,5 +471,11 @@ body {
   .details-row {
     grid-template-columns: 1fr;
     gap: 4px;
+  }
+}
+
+@media (max-width: 900px) {
+  .artwork-main-grid {
+    grid-template-columns: 1fr;
   }
 }
