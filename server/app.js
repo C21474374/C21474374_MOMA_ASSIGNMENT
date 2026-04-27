@@ -9,10 +9,14 @@ dotenv.config();
 const app = express();
 const port = process.env.PORT || 8080;
 
+// Parse incoming JSON request bodies for POST/PUT APIs.
+app.use(express.json());
+
 app.get("/", (req, res) => {
   res.send("Hello World from Express!");
 });
 
+// Mount API resource routes under a shared /api prefix.
 app.use("/api/artists", artistsRoutes);
 app.use("/api/artwork", artworkRoutes);
 
