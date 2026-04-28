@@ -1,0 +1,9 @@
+$kind: http-request
+name: logged in account data
+url: http://localhost:3001/api/auth/me
+method: GET
+auth:
+  type: bearer
+  credentials:
+    token: eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJzdWIiOiI2OWVmZjJmM2YyMzFhYTRhMzlhOTAxOTMiLCJlbWFpbCI6ImRlbW8xQGV4YW1wbGUuY29tIiwiaWF0IjoxNzc3MzM0NTI3LCJleHAiOjE3Nzc5MzkzMjd9.88AlHKLEPGfuVrrhHVZLgrlNztiVjpENidpMJ1d4D7M
+order: 1777243900058

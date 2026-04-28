@@ -1,0 +1,7 @@
+$kind: http-request
+name: Get all artists
+url: http://localhost:3001/api/artists?limit=10
+method: GET
+queryParams:
+  limit: "10"
+order: 1777345875615

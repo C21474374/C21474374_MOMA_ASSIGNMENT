@@ -1,0 +1,5 @@
+$kind: http-request
+name: Get one artist
+url: http://localhost:3001/api/artists/<artistId>
+method: GET
+order: 4129164898335906

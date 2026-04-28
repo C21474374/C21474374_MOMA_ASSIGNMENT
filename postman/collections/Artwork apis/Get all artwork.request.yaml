@@ -1,0 +1,7 @@
+$kind: http-request
+name: Get all artwork
+url: http://localhost:3001/api/artwork?limit=10
+method: GET
+queryParams:
+  limit: "10"
+order: 1777346030305

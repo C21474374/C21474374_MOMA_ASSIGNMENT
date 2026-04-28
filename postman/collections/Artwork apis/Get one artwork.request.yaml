@@ -1,0 +1,5 @@
+$kind: http-request
+name: Get one artwork
+url: http://localhost:3001/api/artwork/<artworkId>
+method: GET
+order: 2560627743124377

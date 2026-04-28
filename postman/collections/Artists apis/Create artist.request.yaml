@@ -1,0 +1,30 @@
+$kind: http-request
+name: Create artist
+url: http://localhost:3001/api/artists
+method: POST
+body:
+  type: json
+  content: "{\r
+
+    \  \"DisplayName\": \"Test Artist\",\r
+
+    \  \"ArtistBio\": \"Created from Postman\",\r
+
+    \  \"Nationality\": \"Irish\",\r
+
+    \  \"Gender\": \"Unknown\",\r
+
+    \  \"BeginDate\": 1990,\r
+
+    \  \"EndDate\": 0,\r
+
+    \  \"ConstituentID\": 999999,\r
+
+    \  \"ULAN\": \"test-ulan\",\r
+
+    \  \"Wiki QID\": \"Q123456\",\r
+
+    \  \"Likes\": 0\r
+
+    }\r\n"
+order: 4199705758378613

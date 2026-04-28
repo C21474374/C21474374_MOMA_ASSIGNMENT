@@ -1,6 +1,7 @@
 const express = require("express");
 const dotenv = require("dotenv");
 const connectDB = require("./mongodb/db");
+const authRoutes = require("./mongodb/routes/auth.routes");
 const artistsRoutes = require("./mongodb/routes/artists.routes");
 const artworkRoutes = require("./mongodb/routes/artwork.routes");
 
@@ -17,6 +18,7 @@ app.get("/", (req, res) => {
 });
 
 // Mount API resource routes under a shared /api prefix.
+app.use("/api/auth", authRoutes);
 app.use("/api/artists", artistsRoutes);
 app.use("/api/artwork", artworkRoutes);
 
