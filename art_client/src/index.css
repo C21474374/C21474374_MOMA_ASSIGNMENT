@@ -92,6 +92,93 @@ body {
   font-weight: 700;
 }
 
+.top-nav-auth {
+  justify-self: end;
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  min-height: 48px;
+}
+
+.nav-auth-status {
+  font-size: 14px;
+  font-weight: 700;
+}
+
+.nav-auth-btn,
+.nav-account-btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-height: 46px;
+  padding: 0 18px;
+  border: 1px solid #000000;
+  background: #ffffff;
+  color: #000000;
+  text-decoration: none;
+  font-size: 16px;
+  font-weight: 700;
+  cursor: pointer;
+}
+
+.nav-auth-btn:hover,
+.nav-account-btn:hover,
+.nav-auth-btn.active,
+.nav-account-btn.active {
+  background: #000000;
+  color: #ffffff;
+}
+
+.nav-auth-btn-primary {
+  background: #000000;
+  color: #ffffff;
+}
+
+.nav-auth-btn-primary:hover,
+.nav-auth-btn-primary.active {
+  background: #181818;
+}
+
+.nav-account {
+  position: relative;
+}
+
+.nav-account-dropdown {
+  position: absolute;
+  right: 0;
+  top: calc(100% + 10px);
+  min-width: 220px;
+  border: 1px solid #000000;
+  background: #ffffff;
+  box-shadow: 0 14px 28px rgba(0, 0, 0, 0.12);
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+}
+
+.nav-account-link {
+  display: block;
+  width: 100%;
+  padding: 14px 16px;
+  border: 0;
+  background: #ffffff;
+  color: #000000;
+  text-align: left;
+  text-decoration: none;
+  font-size: 15px;
+  font-weight: 700;
+  cursor: pointer;
+}
+
+.nav-account-link:hover {
+  background: #000000;
+  color: #ffffff;
+}
+
+.nav-account-button {
+  font-family: inherit;
+}
+
 .page-title {
   margin: 0 0 6px;
   font-size: 34px;
@@ -521,6 +608,107 @@ body {
   line-height: 1.45;
 }
 
+.auth-page {
+  display: flex;
+  justify-content: center;
+}
+
+.auth-panel {
+  width: min(560px, 100%);
+  border: 1px solid #000000;
+  padding: 24px;
+  background: #ffffff;
+}
+
+.auth-header {
+  margin-bottom: 18px;
+}
+
+.auth-kicker {
+  margin: 0 0 8px;
+  font-size: 13px;
+  font-weight: 800;
+  letter-spacing: 0.08em;
+}
+
+.auth-subtitle {
+  margin-bottom: 0;
+}
+
+.auth-form {
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+}
+
+.auth-field {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.auth-label {
+  font-size: 12px;
+  text-transform: uppercase;
+  font-weight: 700;
+  letter-spacing: 0.04em;
+}
+
+.auth-input {
+  width: 100%;
+  border: 1px solid #000000;
+  padding: 12px 14px;
+  font: inherit;
+  background: #ffffff;
+  color: #000000;
+}
+
+.auth-input:focus {
+  outline: 2px solid #000000;
+  outline-offset: 1px;
+}
+
+.auth-error {
+  margin: 0;
+  padding: 12px 14px;
+  border: 1px solid #c81d25;
+  background: #fff4f4;
+  color: #9b1320;
+  font-size: 14px;
+  font-weight: 700;
+}
+
+.auth-submit-btn {
+  align-self: flex-start;
+  min-width: 180px;
+}
+
+.auth-submit-btn:disabled {
+  opacity: 0.6;
+  cursor: wait;
+}
+
+.auth-footer {
+  margin-top: 18px;
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 10px;
+  font-size: 14px;
+}
+
+.account-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
+  gap: 18px;
+}
+
+.account-panel {
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+}
+
 @media (max-width: 700px) {
   .app-shell {
     padding-top: 148px;
@@ -547,6 +735,27 @@ body {
   .top-nav-links {
     width: 100%;
     height: auto;
+  }
+
+  .top-nav-auth {
+    width: 100%;
+    justify-content: stretch;
+    flex-wrap: wrap;
+  }
+
+  .nav-auth-btn,
+  .nav-account-btn {
+    flex: 1;
+  }
+
+  .nav-account {
+    width: 100%;
+  }
+
+  .nav-account-dropdown {
+    position: static;
+    margin-top: 8px;
+    width: 100%;
   }
 
   .nav-link {
