@@ -1,5 +1,6 @@
 import { useEffect, useState } from 'react'
 import type { MouseEvent } from 'react'
+import CrudFormModal, { type CrudFormField } from '../components/CrudFormModal'
 import DetailsModal from '../components/DetailsModal'
 
 const PAGE_SIZE = 50
@@ -26,6 +27,161 @@ type Artwork = {
   OnView?: string
   Likes?: number
   [key: string]: unknown
+}
+
+type ArtworkFormValues = {
+  Title: string
+  Artist: string
+  Date: string
+  Medium: string
+  Classification: string
+  Department: string
+  Dimensions: string
+  AccessionNumber: string
+  ObjectID: string
+  URL: string
+  ImageURL: string
+  OnView: string
+  CreditLine: string
+}
+
+const ARTWORK_FORM_FIELDS: CrudFormField[] = [
+  { name: 'Title', label: 'Title', required: true, placeholder: 'Artwork title' },
+  { name: 'Artist', label: 'Artist', placeholder: 'Artist name' },
+  { name: 'Date', label: 'Date', placeholder: '1962' },
+  { name: 'Medium', label: 'Medium', placeholder: 'Oil on canvas' },
+  {
+    name: 'Classification',
+    label: 'Classification',
+    placeholder: 'Painting',
+  },
+  { name: 'Department', label: 'Department', placeholder: 'Painting & Sculpture' },
+  { name: 'Dimensions', label: 'Dimensions', placeholder: '50 x 70 cm' },
+  {
+    name: 'AccessionNumber',
+    label: 'Accession Number',
+    placeholder: '2026.1',
+  },
+  { name: 'ObjectID', label: 'Object ID', type: 'number', placeholder: '100001' },
+  { name: 'URL', label: 'Artwork URL', type: 'url', placeholder: 'https://example.com' },
+  {
+    name: 'ImageURL',
+    label: 'Image URL',
+    type: 'url',
+    placeholder: 'https://example.com/image.jpg',
+  },
+  { name: 'OnView', label: 'On View', placeholder: 'Yes / No' },
+  {
+    name: 'CreditLine',
+    label: 'Credit Line',
+    type: 'textarea',
+    rows: 4,
+    placeholder: 'Gift of...',
+  },
+]
+
+const EMPTY_ARTWORK_FORM_VALUES: ArtworkFormValues = {
+  Title: '',
+  Artist: '',
+  Date: '',
+  Medium: '',
+  Classification: '',
+  Department: '',
+  Dimensions: '',
+  AccessionNumber: '',
+  ObjectID: '',
+  URL: '',
+  ImageURL: '',
+  OnView: '',
+  CreditLine: '',
+}
+
+function getTextInputValue(value: unknown) {
+  if (value === null || value === undefined) {
+    return ''
+  }
+  if (Array.isArray(value)) {
+    return value.join(', ')
+  }
+  return String(value)
+}
+
+function getNumberInputValue(value: unknown) {
+  if (typeof value === 'number' && Number.isFinite(value)) {
+    return String(value)
+  }
+  if (typeof value === 'string') {
+    return value
+  }
+  return ''
+}
+
+function getArtworkFormValues(item: Artwork | null): ArtworkFormValues {
+  if (!item) {
+    return { ...EMPTY_ARTWORK_FORM_VALUES }
+  }
+
+  return {
+    Title: getTextInputValue(item.Title),
+    Artist: getTextInputValue(item.Artist),
+    Date: getTextInputValue(item.Date),
+    Medium: getTextInputValue(item.Medium),
+    Classification: getTextInputValue(item.Classification),
+    Department: getTextInputValue(item.Department),
+    Dimensions: getTextInputValue(item.Dimensions),
+    AccessionNumber: getTextInputValue(item.AccessionNumber),
+    ObjectID: getNumberInputValue(item.ObjectID),
+    URL: getTextInputValue(item.URL),
+    ImageURL: getTextInputValue(item.ImageURL),
+    OnView: getTextInputValue(item.OnView),
+    CreditLine: getTextInputValue(item.CreditLine),
+  }
+}
+
+function parseOptionalNumberField(value: string, label: string) {
+  const trimmedValue = value.trim()
+  if (!trimmedValue) {
+    return null
+  }
+
+  const parsedValue = Number(trimmedValue)
+  if (!Number.isFinite(parsedValue)) {
+    throw new Error(`${label} must be a valid number.`)
+  }
+
+  return parsedValue
+}
+
+function buildArtworkPayload(values: ArtworkFormValues, isCreate: boolean) {
+  const title = values.Title.trim()
+  if (!title) {
+    throw new Error('Artwork title is required.')
+  }
+
+  const payload: Record<string, unknown> = {
+    Title: title,
+    Artist: values.Artist
+      .split(',')
+      .map((name) => name.trim())
+      .filter(Boolean),
+    Date: values.Date.trim(),
+    Medium: values.Medium.trim(),
+    Classification: values.Classification.trim(),
+    Department: values.Department.trim(),
+    Dimensions: values.Dimensions.trim(),
+    AccessionNumber: values.AccessionNumber.trim(),
+    ObjectID: parseOptionalNumberField(values.ObjectID, 'Object ID'),
+    URL: values.URL.trim(),
+    ImageURL: values.ImageURL.trim(),
+    OnView: values.OnView.trim(),
+    CreditLine: values.CreditLine.trim(),
+  }
+
+  if (isCreate) {
+    payload.Likes = 0
+  }
+
+  return payload
 }
 
 function asDisplayValue(value: unknown) {
@@ -74,6 +230,14 @@ function ArtworkPage() {
   const [detailsLoading, setDetailsLoading] = useState(false)
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState('')
+  const [artworkEditorMode, setArtworkEditorMode] = useState<'create' | 'edit' | null>(
+    null
+  )
+  const [artworkEditorValues, setArtworkEditorValues] = useState<ArtworkFormValues>(
+    EMPTY_ARTWORK_FORM_VALUES
+  )
+  const [artworkEditorError, setArtworkEditorError] = useState('')
+  const [artworkEditorSubmitting, setArtworkEditorSubmitting] = useState(false)
 
   useEffect(() => {
     let isMounted = true
@@ -120,6 +284,110 @@ function ArtworkPage() {
   const closeDetails = () => {
     setSelectedArtwork(null)
     setDetailsLoading(false)
+  }
+
+  const closeArtworkEditor = () => {
+    setArtworkEditorMode(null)
+    setArtworkEditorValues({ ...EMPTY_ARTWORK_FORM_VALUES })
+    setArtworkEditorError('')
+    setArtworkEditorSubmitting(false)
+  }
+
+  const openCreateArtworkEditor = () => {
+    setArtworkEditorMode('create')
+    setArtworkEditorValues({ ...EMPTY_ARTWORK_FORM_VALUES })
+    setArtworkEditorError('')
+  }
+
+  const openEditArtworkEditor = (item: Artwork) => {
+    setArtworkEditorMode('edit')
+    setArtworkEditorValues(getArtworkFormValues(item))
+    setArtworkEditorError('')
+  }
+
+  const handleArtworkEditorSubmit = async (values: Record<string, string>) => {
+    const isCreate = artworkEditorMode === 'create'
+    const targetArtwork = isCreate ? null : selectedArtwork
+
+    if (!isCreate && !targetArtwork) {
+      setArtworkEditorError('Select an artwork item before trying to update it.')
+      return
+    }
+
+    setArtworkEditorSubmitting(true)
+    setArtworkEditorError('')
+
+    try {
+      const payload = buildArtworkPayload(values as ArtworkFormValues, isCreate)
+      const response = await fetch(
+        isCreate ? '/api/artwork' : `/api/artwork/${targetArtwork?._id}`,
+        {
+          method: isCreate ? 'POST' : 'PUT',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify(payload),
+        }
+      )
+
+      if (!response.ok) {
+        throw new Error(
+          isCreate ? 'Failed to create artwork.' : 'Failed to update artwork.'
+        )
+      }
+
+      const savedArtwork = (await response.json()) as Artwork
+
+      if (isCreate) {
+        setArtwork((prev) => [savedArtwork, ...prev])
+      } else {
+        setArtwork((prev) =>
+          prev.map((item) => (item._id === savedArtwork._id ? savedArtwork : item))
+        )
+        setSelectedArtwork((prev) =>
+          prev && prev._id === savedArtwork._id ? savedArtwork : prev
+        )
+      }
+
+      closeArtworkEditor()
+    } catch (submitError) {
+      setArtworkEditorError(
+        submitError instanceof Error ? submitError.message : 'Unable to save artwork.'
+      )
+    } finally {
+      setArtworkEditorSubmitting(false)
+    }
+  }
+
+  const handleDeleteArtwork = async () => {
+    if (!selectedArtwork) {
+      return
+    }
+
+    const confirmed = window.confirm(
+      `Delete ${selectedArtwork.Title || 'this artwork'}? This cannot be undone.`
+    )
+    if (!confirmed) {
+      return
+    }
+
+    try {
+      const response = await fetch(`/api/artwork/${selectedArtwork._id}`, {
+        method: 'DELETE',
+      })
+
+      if (!response.ok) {
+        throw new Error('Failed to delete artwork.')
+      }
+
+      setArtwork((prev) => prev.filter((item) => item._id !== selectedArtwork._id))
+      setLikedArtworkIds((prev) => {
+        const next = new Set(prev)
+        next.delete(selectedArtwork._id)
+        return next
+      })
+      closeDetails()
+    } catch {
+      window.alert('Failed to delete artwork. Please try again.')
+    }
   }
 
   const openArtworkDetails = async (item: Artwork) => {
@@ -249,10 +517,23 @@ function ArtworkPage() {
 
   return (
     <section className="collection-page">
-      <h1 className="page-title">Artwork</h1>
-      <p className="page-subtitle">
-        Showing {visibleArtwork.length} out of {artwork.length} artworks
-      </p>
+      <div className="collection-header">
+        <div>
+          <h1 className="page-title">Artwork</h1>
+          <p className="page-subtitle">
+            Showing {visibleArtwork.length} out of {artwork.length} artworks
+          </p>
+        </div>
+        <div className="collection-header-actions">
+          <button
+            type="button"
+            className="collection-action-btn"
+            onClick={openCreateArtworkEditor}
+          >
+            Add Artwork
+          </button>
+        </div>
+      </div>
       <div className="card-grid">
         {visibleArtwork.map((item) => {
           const isLiked = likedArtworkIds.has(item._id)
@@ -317,6 +598,22 @@ function ArtworkPage() {
       >
         {selectedArtwork && (
           <div className="modal-content artwork-modal-layout">
+            <div className="detail-toolbar">
+              <button
+                type="button"
+                className="detail-action-btn"
+                onClick={() => openEditArtworkEditor(selectedArtwork)}
+              >
+                Edit Artwork
+              </button>
+              <button
+                type="button"
+                className="detail-action-btn detail-action-btn-danger"
+                onClick={handleDeleteArtwork}
+              >
+                Delete Artwork
+              </button>
+            </div>
             <div className="artwork-main-grid">
               <section className="modal-section modal-section-with-like">
                 <h3 className="modal-section-title">Artwork Information</h3>
@@ -458,6 +755,17 @@ function ArtworkPage() {
           </div>
         )}
       </DetailsModal>
+      <CrudFormModal
+        isOpen={artworkEditorMode !== null}
+        title={artworkEditorMode === 'create' ? 'Add Artwork' : 'Edit Artwork'}
+        submitLabel={artworkEditorMode === 'create' ? 'Create Artwork' : 'Save Changes'}
+        fields={ARTWORK_FORM_FIELDS}
+        initialValues={artworkEditorValues}
+        error={artworkEditorError}
+        submitting={artworkEditorSubmitting}
+        onClose={closeArtworkEditor}
+        onSubmit={handleArtworkEditorSubmit}
+      />
     </section>
   )
 }

@@ -1,5 +1,6 @@
 import { useEffect, useMemo, useState } from 'react'
 import type { MouseEvent } from 'react'
+import CrudFormModal, { type CrudFormField } from '../components/CrudFormModal'
 import DetailsModal from '../components/DetailsModal'
 
 const PAGE_SIZE = 50
@@ -48,6 +49,130 @@ type ArtworkSummary = {
   ImageURL?: string
   Likes?: number
   [key: string]: unknown
+}
+
+type ArtistFormValues = {
+  DisplayName: string
+  ArtistBio: string
+  Nationality: string
+  Gender: string
+  BeginDate: string
+  EndDate: string
+  ConstituentID: string
+  ULAN: string
+  'Wiki QID': string
+}
+
+const ARTIST_FORM_FIELDS: CrudFormField[] = [
+  { name: 'DisplayName', label: 'Name', required: true, placeholder: 'Artist name' },
+  {
+    name: 'ArtistBio',
+    label: 'Biography',
+    type: 'textarea',
+    rows: 5,
+    placeholder: 'Short artist biography',
+  },
+  { name: 'Nationality', label: 'Nationality', placeholder: 'Irish' },
+  { name: 'Gender', label: 'Gender', placeholder: 'Unknown' },
+  { name: 'BeginDate', label: 'Birth Year', type: 'number', placeholder: '1900' },
+  { name: 'EndDate', label: 'Death Year', type: 'number', placeholder: '1980' },
+  {
+    name: 'ConstituentID',
+    label: 'Constituent ID',
+    type: 'number',
+    placeholder: '100001',
+  },
+  { name: 'ULAN', label: 'ULAN', placeholder: '500011051' },
+  { name: 'Wiki QID', label: 'Wiki QID', placeholder: 'Q5582' },
+]
+
+const EMPTY_ARTIST_FORM_VALUES: ArtistFormValues = {
+  DisplayName: '',
+  ArtistBio: '',
+  Nationality: '',
+  Gender: '',
+  BeginDate: '',
+  EndDate: '',
+  ConstituentID: '',
+  ULAN: '',
+  'Wiki QID': '',
+}
+
+function getTextInputValue(value: unknown) {
+  if (value === null || value === undefined) {
+    return ''
+  }
+  if (Array.isArray(value)) {
+    return value.join(', ')
+  }
+  return String(value)
+}
+
+function getNumberInputValue(value: unknown) {
+  if (typeof value === 'number' && Number.isFinite(value)) {
+    return String(value)
+  }
+  if (typeof value === 'string') {
+    return value
+  }
+  return ''
+}
+
+function getArtistFormValues(artist: Artist | null): ArtistFormValues {
+  if (!artist) {
+    return { ...EMPTY_ARTIST_FORM_VALUES }
+  }
+
+  return {
+    DisplayName: getTextInputValue(artist.DisplayName),
+    ArtistBio: getTextInputValue(artist.ArtistBio),
+    Nationality: getTextInputValue(artist.Nationality),
+    Gender: getTextInputValue(artist.Gender),
+    BeginDate: getNumberInputValue(artist.BeginDate),
+    EndDate: getNumberInputValue(artist.EndDate),
+    ConstituentID: getNumberInputValue(artist.ConstituentID),
+    ULAN: getTextInputValue(artist.ULAN),
+    'Wiki QID': getTextInputValue(artist['Wiki QID']),
+  }
+}
+
+function parseOptionalNumberField(value: string, label: string) {
+  const trimmedValue = value.trim()
+  if (!trimmedValue) {
+    return null
+  }
+
+  const parsedValue = Number(trimmedValue)
+  if (!Number.isFinite(parsedValue)) {
+    throw new Error(`${label} must be a valid number.`)
+  }
+
+  return parsedValue
+}
+
+function buildArtistPayload(values: ArtistFormValues, isCreate: boolean) {
+  const displayName = values.DisplayName.trim()
+  if (!displayName) {
+    throw new Error('Artist name is required.')
+  }
+
+  const payload: Record<string, unknown> = {
+    DisplayName: displayName,
+    ArtistBio: values.ArtistBio.trim(),
+    Nationality: values.Nationality.trim(),
+    Gender: values.Gender.trim(),
+    BeginDate: parseOptionalNumberField(values.BeginDate, 'Birth year'),
+    EndDate: parseOptionalNumberField(values.EndDate, 'Death year'),
+    ConstituentID: parseOptionalNumberField(values.ConstituentID, 'Constituent ID'),
+    ULAN: values.ULAN.trim(),
+    'Wiki QID': values['Wiki QID'].trim(),
+  }
+
+  if (isCreate) {
+    payload.Likes = 0
+  }
+
+  return payload
 }
 
 function asDisplayValue(value: unknown) {
@@ -141,6 +266,14 @@ function ArtistsPage() {
   const [carouselPage, setCarouselPage] = useState(0)
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState('')
+  const [artistEditorMode, setArtistEditorMode] = useState<'create' | 'edit' | null>(
+    null
+  )
+  const [artistEditorValues, setArtistEditorValues] = useState<ArtistFormValues>(
+    EMPTY_ARTIST_FORM_VALUES
+  )
+  const [artistEditorError, setArtistEditorError] = useState('')
+  const [artistEditorSubmitting, setArtistEditorSubmitting] = useState(false)
 
   useEffect(() => {
     let isMounted = true
@@ -192,6 +325,110 @@ function ArtistsPage() {
     setRelatedDetailsLoading(false)
     setRelatedArtwork([])
     setCarouselPage(0)
+  }
+
+  const closeArtistEditor = () => {
+    setArtistEditorMode(null)
+    setArtistEditorValues({ ...EMPTY_ARTIST_FORM_VALUES })
+    setArtistEditorError('')
+    setArtistEditorSubmitting(false)
+  }
+
+  const openCreateArtistEditor = () => {
+    setArtistEditorMode('create')
+    setArtistEditorValues({ ...EMPTY_ARTIST_FORM_VALUES })
+    setArtistEditorError('')
+  }
+
+  const openEditArtistEditor = (artist: Artist) => {
+    setArtistEditorMode('edit')
+    setArtistEditorValues(getArtistFormValues(artist))
+    setArtistEditorError('')
+  }
+
+  const handleArtistEditorSubmit = async (values: Record<string, string>) => {
+    const isCreate = artistEditorMode === 'create'
+    const targetArtist = isCreate ? null : selectedArtist
+
+    if (!isCreate && !targetArtist) {
+      setArtistEditorError('Select an artist before trying to update it.')
+      return
+    }
+
+    setArtistEditorSubmitting(true)
+    setArtistEditorError('')
+
+    try {
+      const payload = buildArtistPayload(values as ArtistFormValues, isCreate)
+      const response = await fetch(
+        isCreate ? '/api/artists' : `/api/artists/${targetArtist?._id}`,
+        {
+          method: isCreate ? 'POST' : 'PUT',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify(payload),
+        }
+      )
+
+      if (!response.ok) {
+        throw new Error(
+          isCreate ? 'Failed to create artist.' : 'Failed to update artist.'
+        )
+      }
+
+      const savedArtist = (await response.json()) as Artist
+
+      if (isCreate) {
+        setArtists((prev) => [savedArtist, ...prev])
+      } else {
+        setArtists((prev) =>
+          prev.map((artist) => (artist._id === savedArtist._id ? savedArtist : artist))
+        )
+        setSelectedArtist((prev) =>
+          prev && prev._id === savedArtist._id ? savedArtist : prev
+        )
+      }
+
+      closeArtistEditor()
+    } catch (submitError) {
+      setArtistEditorError(
+        submitError instanceof Error ? submitError.message : 'Unable to save artist.'
+      )
+    } finally {
+      setArtistEditorSubmitting(false)
+    }
+  }
+
+  const handleDeleteArtist = async () => {
+    if (!selectedArtist) {
+      return
+    }
+
+    const confirmed = window.confirm(
+      `Delete ${selectedArtist.DisplayName || 'this artist'}? This cannot be undone.`
+    )
+    if (!confirmed) {
+      return
+    }
+
+    try {
+      const response = await fetch(`/api/artists/${selectedArtist._id}`, {
+        method: 'DELETE',
+      })
+
+      if (!response.ok) {
+        throw new Error('Failed to delete artist.')
+      }
+
+      setArtists((prev) => prev.filter((artist) => artist._id !== selectedArtist._id))
+      setLikedArtistIds((prev) => {
+        const next = new Set(prev)
+        next.delete(selectedArtist._id)
+        return next
+      })
+      closeDetails()
+    } catch {
+      window.alert('Failed to delete artist. Please try again.')
+    }
   }
 
   const openArtistDetails = async (artist: Artist) => {
@@ -493,10 +730,23 @@ function ArtistsPage() {
 
   return (
     <section className="collection-page">
-      <h1 className="page-title">Artists</h1>
-      <p className="page-subtitle">
-        Showing {visibleArtists.length} out of {artists.length} artists
-      </p>
+      <div className="collection-header">
+        <div>
+          <h1 className="page-title">Artists</h1>
+          <p className="page-subtitle">
+            Showing {visibleArtists.length} out of {artists.length} artists
+          </p>
+        </div>
+        <div className="collection-header-actions">
+          <button
+            type="button"
+            className="collection-action-btn"
+            onClick={openCreateArtistEditor}
+          >
+            Add Artist
+          </button>
+        </div>
+      </div>
       <div className="card-grid">
         {visibleArtists.map((artist) => {
           const isLiked = likedArtistIds.has(artist._id)
@@ -714,6 +964,22 @@ function ArtistsPage() {
         ) : (
           selectedArtist && (
           <div className="modal-content">
+            <div className="detail-toolbar">
+              <button
+                type="button"
+                className="detail-action-btn"
+                onClick={() => openEditArtistEditor(selectedArtist)}
+              >
+                Edit Artist
+              </button>
+              <button
+                type="button"
+                className="detail-action-btn detail-action-btn-danger"
+                onClick={handleDeleteArtist}
+              >
+                Delete Artist
+              </button>
+            </div>
             <section className="modal-section modal-section-with-like">
               <h3 className="modal-section-title">Artist Information</h3>
               <div className="modal-info-grid">
@@ -865,6 +1131,17 @@ function ArtistsPage() {
           )
         )}
       </DetailsModal>
+      <CrudFormModal
+        isOpen={artistEditorMode !== null}
+        title={artistEditorMode === 'create' ? 'Add Artist' : 'Edit Artist'}
+        submitLabel={artistEditorMode === 'create' ? 'Create Artist' : 'Save Changes'}
+        fields={ARTIST_FORM_FIELDS}
+        initialValues={artistEditorValues}
+        error={artistEditorError}
+        submitting={artistEditorSubmitting}
+        onClose={closeArtistEditor}
+        onSubmit={handleArtistEditorSubmit}
+      />
     </section>
   )
 }

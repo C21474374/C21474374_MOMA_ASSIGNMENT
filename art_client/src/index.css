@@ -25,6 +25,40 @@ body {
   padding: calc(var(--top-nav-height) + 24px) 24px 24px;
 }
 
+.app-shell main {
+  min-width: 0;
+}
+
+.site-footer {
+  margin-top: 72px;
+  border-top: 1px solid #000000;
+  padding: 24px 0 12px;
+}
+
+.site-footer-inner {
+  display: flex;
+  align-items: end;
+  justify-content: space-between;
+  gap: 20px;
+}
+
+.site-footer-brand,
+.site-footer-copy {
+  margin: 0;
+}
+
+.site-footer-brand {
+  font-size: 20px;
+  font-weight: 800;
+}
+
+.site-footer-copy {
+  max-width: 520px;
+  font-size: 15px;
+  line-height: 1.55;
+  text-align: right;
+}
+
 .top-nav {
   position: fixed;
   top: 0;
@@ -296,6 +330,54 @@ body {
   display: none;
 }
 
+.collection-header {
+  display: flex;
+  align-items: end;
+  justify-content: space-between;
+  gap: 20px;
+  margin-bottom: 24px;
+}
+
+.collection-header-actions {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+
+.collection-action-btn,
+.detail-action-btn,
+.crud-btn {
+  border: 1px solid #000000;
+  background: #ffffff;
+  color: #000000;
+  font: inherit;
+  font-size: 16px;
+  font-weight: 700;
+  cursor: pointer;
+}
+
+.collection-action-btn,
+.detail-action-btn {
+  padding: 12px 16px;
+}
+
+.collection-action-btn:hover,
+.detail-action-btn:hover,
+.crud-btn:hover {
+  background: #000000;
+  color: #ffffff;
+}
+
+.detail-action-btn-danger {
+  color: #c81d25;
+  border-color: #c81d25;
+}
+
+.detail-action-btn-danger:hover {
+  background: #c81d25;
+  color: #ffffff;
+}
+
 .page-title {
   margin: 0 0 6px;
   font-size: 34px;
@@ -537,6 +619,12 @@ body {
   display: flex;
   flex-direction: column;
   gap: 18px;
+}
+
+.detail-toolbar {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 12px;
 }
 
 .artwork-main-grid {
@@ -820,7 +908,7 @@ body {
 .about-page {
   display: flex;
   flex-direction: column;
-  gap: 28px;
+  gap: 100px;
 }
 
 .home-page .page-title,
@@ -1174,6 +1262,90 @@ body {
   gap: 14px;
 }
 
+.crud-modal-panel {
+  width: min(880px, 100%);
+}
+
+.crud-form {
+  display: flex;
+  flex-direction: column;
+  gap: 18px;
+}
+
+.crud-form-grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 16px;
+}
+
+.crud-field {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.crud-field-full {
+  grid-column: 1 / -1;
+}
+
+.crud-label {
+  font-size: 12px;
+  text-transform: uppercase;
+  font-weight: 700;
+  letter-spacing: 0.04em;
+}
+
+.crud-input {
+  width: 100%;
+  border: 1px solid #000000;
+  padding: 12px 14px;
+  font: inherit;
+  background: #ffffff;
+  color: #000000;
+}
+
+.crud-textarea {
+  resize: vertical;
+  min-height: 120px;
+}
+
+.crud-input:focus,
+.crud-textarea:focus {
+  outline: 2px solid #000000;
+  outline-offset: 1px;
+}
+
+.crud-error {
+  margin: 0;
+  padding: 12px 14px;
+  border: 1px solid #c81d25;
+  background: #fff4f4;
+  color: #9b1320;
+  font-size: 15px;
+  font-weight: 700;
+}
+
+.crud-actions {
+  display: flex;
+  justify-content: flex-end;
+  gap: 12px;
+  padding-top: 14px;
+  border-top: 1px solid #000000;
+}
+
+.crud-btn {
+  padding: 12px 18px;
+}
+
+.crud-btn-primary {
+  background: #000000;
+  color: #ffffff;
+}
+
+.crud-btn-primary:hover {
+  background: #181818;
+}
+
 @media (max-width: 700px) {
   .app-shell {
     padding-top: 120px;
@@ -1274,9 +1446,57 @@ body {
     gap: 4px;
   }
 
+  .collection-header {
+    flex-direction: column;
+    align-items: start;
+  }
+
+  .collection-header-actions {
+    width: 100%;
+  }
+
+  .collection-action-btn {
+    width: 100%;
+  }
+
+  .detail-toolbar {
+    flex-direction: column;
+  }
+
+  .detail-action-btn {
+    width: 100%;
+  }
+
+  .crud-form-grid {
+    grid-template-columns: 1fr;
+  }
+
+  .crud-actions {
+    flex-direction: column-reverse;
+  }
+
+  .crud-btn {
+    width: 100%;
+  }
+
   .home-page .page-title,
   .about-page .page-title {
     font-size: 34px;
+  }
+
+  .site-footer {
+    margin-top: 56px;
+    padding-top: 20px;
+  }
+
+  .site-footer-inner {
+    flex-direction: column;
+    align-items: start;
+  }
+
+  .site-footer-copy {
+    max-width: none;
+    text-align: left;
   }
 
   .home-hero-title {

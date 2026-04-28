@@ -638,7 +638,7 @@ function HomePage() {
       <section className="home-section">
         <div className="home-section-header">
           <div>
-            <p className="home-section-kicker">Featured Works</p>
+            
             <h2 className="page-title home-section-title">Artwork Highlights</h2>
             <p className="page-subtitle home-section-subtitle">
               A rotating-style preview of pieces currently living in the collection
@@ -731,7 +731,7 @@ function HomePage() {
       <section className="home-section">
         <div className="home-section-header">
           <div>
-            <p className="home-section-kicker">Featured Artists</p>
+            
             <h2 className="page-title home-section-title">Artists to Explore</h2>
             <p className="page-subtitle home-section-subtitle">
               A quick way into the people behind the collection.

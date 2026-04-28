@@ -331,6 +331,14 @@ function App() {
 
       <div className="app-shell">
         <main>{page}</main>
+        <footer className="site-footer">
+          <div className="site-footer-inner">
+            <p className="site-footer-brand">MoMA Collection Explorer</p>
+            <p className="site-footer-copy">
+              Explore artists, artworks, and the stories behind modern art.
+            </p>
+          </div>
+        </footer>
       </div>
     </>
   )
