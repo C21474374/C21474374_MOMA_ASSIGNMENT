@@ -492,7 +492,7 @@ function ArtistsPage() {
     : false
 
   return (
-    <section>
+    <section className="collection-page">
       <h1 className="page-title">Artists</h1>
       <p className="page-subtitle">
         Showing {visibleArtists.length} out of {artists.length} artists

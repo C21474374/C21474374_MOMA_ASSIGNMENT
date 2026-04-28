@@ -2,15 +2,30 @@ import { useEffect, useMemo, useRef, useState } from 'react'
 import HomePage from './pages/HomePage'
 import ArtistsPage from './pages/ArtistsPage'
 import ArtworkPage from './pages/ArtworkPage'
+import AboutPage from './pages/AboutPage'
 import LoginPage from './pages/LoginPage'
 import RegisterPage from './pages/RegisterPage'
 import AccountSettingsPage from './pages/AccountSettingsPage'
 import type { AuthResponse, AuthUser } from './types/auth'
 import { getCurrentUser } from './utils/auth'
 
-type View = 'home' | 'artists' | 'artwork' | 'login' | 'register' | 'account'
+type View =
+  | 'home'
+  | 'artists'
+  | 'artwork'
+  | 'about'
+  | 'login'
+  | 'register'
+  | 'account'
 
 const AUTH_TOKEN_STORAGE_KEY = 'artapp.authToken'
+
+const PRIMARY_NAV_ITEMS: Array<{ label: string; href: string; view: View }> = [
+  { label: 'Home', href: '#/home', view: 'home' },
+  { label: 'Artwork', href: '#/artwork', view: 'artwork' },
+  { label: 'Artists', href: '#/artists', view: 'artists' },
+  { label: 'About', href: '#/about', view: 'about' },
+]
 
 function parseViewFromHash(hash: string): View {
   const value = hash.replace(/^#\/?/, '').toLowerCase()
@@ -22,6 +37,9 @@ function parseViewFromHash(hash: string): View {
   }
   if (value === 'artists') {
     return 'artists'
+  }
+  if (value === 'about') {
+    return 'about'
   }
   if (value === 'login') {
     return 'login'
@@ -43,6 +61,7 @@ function App() {
   })
   const [authLoading, setAuthLoading] = useState(true)
   const [accountMenuOpen, setAccountMenuOpen] = useState(false)
+  const [mobileNavOpen, setMobileNavOpen] = useState(false)
   const accountMenuRef = useRef<HTMLDivElement | null>(null)
 
   useEffect(() => {
@@ -53,6 +72,7 @@ function App() {
     const onHashChange = () => {
       setView(parseViewFromHash(window.location.hash))
       setAccountMenuOpen(false)
+      setMobileNavOpen(false)
     }
 
     window.addEventListener('hashchange', onHashChange)
@@ -113,6 +133,19 @@ function App() {
   }, [authLoading, authUser, view])
 
   useEffect(() => {
+    const handleResize = () => {
+      if (window.innerWidth > 700) {
+        setMobileNavOpen(false)
+      }
+    }
+
+    window.addEventListener('resize', handleResize)
+    return () => {
+      window.removeEventListener('resize', handleResize)
+    }
+  }, [])
+
+  useEffect(() => {
     const handlePointerDown = (event: MouseEvent) => {
       if (!accountMenuRef.current?.contains(event.target as Node)) {
         setAccountMenuOpen(false)
@@ -130,6 +163,7 @@ function App() {
     setAuthToken(response.token)
     window.localStorage.setItem(AUTH_TOKEN_STORAGE_KEY, response.token)
     setAccountMenuOpen(false)
+    setMobileNavOpen(false)
     window.location.hash = '/account'
   }
 
@@ -138,14 +172,30 @@ function App() {
     setAuthToken(null)
     window.localStorage.removeItem(AUTH_TOKEN_STORAGE_KEY)
     setAccountMenuOpen(false)
+    setMobileNavOpen(false)
     window.location.hash = '/home'
   }
 
   const accountLabel = authUser?.displayName?.trim() || authUser?.email || 'Account'
 
+  const renderPrimaryNav = (className: string, onNavigate?: () => void) =>
+    PRIMARY_NAV_ITEMS.map((item) => (
+      <a
+        href={item.href}
+        className={`${className} ${view === item.view ? 'active' : ''}`}
+        key={item.view}
+        onClick={onNavigate}
+      >
+        {item.label}
+      </a>
+    ))
+
   const page = useMemo(() => {
     if (view === 'home') {
       return <HomePage />
+    }
+    if (view === 'about') {
+      return <AboutPage />
     }
     if (view === 'login') {
       return <LoginPage onAuthSuccess={handleAuthSuccess} />
@@ -166,34 +216,44 @@ function App() {
     <>
       <header className="top-nav">
         <div className="top-nav-inner">
-          <a href="#/home" className="nav-brand">
-            MoMA
-          </a>
-          <nav className="top-nav-links" aria-label="Primary">
+          <div className="top-nav-left">
+            <button
+              type="button"
+              className={`nav-menu-toggle ${mobileNavOpen ? 'open' : ''}`}
+              aria-label={mobileNavOpen ? 'Close navigation menu' : 'Open navigation menu'}
+              aria-expanded={mobileNavOpen}
+              onClick={() => {
+                setMobileNavOpen((prev) => !prev)
+                setAccountMenuOpen(false)
+              }}
+            >
+              <span className="nav-menu-line" />
+              <span className="nav-menu-line" />
+              <span className="nav-menu-line" />
+            </button>
             <a
               href="#/home"
-              className={`nav-link ${view === 'home' ? 'active' : ''}`}
+              className="nav-brand"
+              onClick={() => setMobileNavOpen(false)}
             >
-              Home
+              MoMA
             </a>
-            <a
-              href="#/artists"
-              className={`nav-link ${view === 'artists' ? 'active' : ''}`}
-            >
-              Artists
-            </a>
-            <a
-              href="#/artwork"
-              className={`nav-link ${view === 'artwork' ? 'active' : ''}`}
-            >
-              Artwork
-            </a>
+          </div>
+
+          <nav className="top-nav-links" aria-label="Primary">
+            {renderPrimaryNav('nav-link')}
           </nav>
+
           <div className="top-nav-auth">
             {authLoading ? (
               <span className="nav-auth-status">Checking session...</span>
             ) : authUser ? (
-              <div className="nav-account" ref={accountMenuRef}>
+              <div
+                className="nav-account"
+                ref={accountMenuRef}
+                onMouseEnter={() => setAccountMenuOpen(true)}
+                onMouseLeave={() => setAccountMenuOpen(false)}
+              >
                 <button
                   type="button"
                   className={`nav-account-btn ${
@@ -203,7 +263,11 @@ function App() {
                   aria-expanded={accountMenuOpen}
                   aria-haspopup="menu"
                 >
-                  {accountLabel}
+                  <span>{accountLabel}</span>
+                  <span
+                    className={`nav-account-arrow ${accountMenuOpen ? 'open' : ''}`}
+                    aria-hidden="true"
+                  />
                 </button>
                 {accountMenuOpen && (
                   <div className="nav-account-dropdown" role="menu">
@@ -217,7 +281,7 @@ function App() {
                     </a>
                     <button
                       type="button"
-                      className="nav-account-link nav-account-button"
+                      className="nav-account-link nav-account-button nav-account-link-danger"
                       role="menuitem"
                       onClick={handleLogout}
                     >
@@ -231,6 +295,7 @@ function App() {
                 <a
                   href="#/login"
                   className={`nav-auth-btn ${view === 'login' ? 'active' : ''}`}
+                  onClick={() => setMobileNavOpen(false)}
                 >
                   Login
                 </a>
@@ -239,6 +304,7 @@ function App() {
                   className={`nav-auth-btn nav-auth-btn-primary ${
                     view === 'register' ? 'active' : ''
                   }`}
+                  onClick={() => setMobileNavOpen(false)}
                 >
                   Sign Up
                 </a>
@@ -246,7 +312,23 @@ function App() {
             )}
           </div>
         </div>
+
+        {mobileNavOpen && (
+          <div className="mobile-nav-panel">
+            <a
+              href="#/home"
+              className="mobile-nav-brand"
+              onClick={() => setMobileNavOpen(false)}
+            >
+              MoMA
+            </a>
+            <nav className="mobile-nav-links" aria-label="Mobile Primary">
+              {renderPrimaryNav('nav-link mobile-nav-link', () => setMobileNavOpen(false))}
+            </nav>
+          </div>
+        )}
       </header>
+
       <div className="app-shell">
         <main>{page}</main>
       </div>

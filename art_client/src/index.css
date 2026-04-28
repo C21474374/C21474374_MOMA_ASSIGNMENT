@@ -48,6 +48,46 @@ body {
   gap: 20px;
 }
 
+.top-nav-left {
+  display: flex;
+  align-items: center;
+  gap: 16px;
+  justify-self: start;
+}
+
+.nav-menu-toggle {
+  display: none;
+  width: 44px;
+  height: 44px;
+  border: 1px solid #000000;
+  background: #ffffff;
+  padding: 0;
+  cursor: pointer;
+  align-items: center;
+  justify-content: center;
+  flex-direction: column;
+  gap: 5px;
+}
+
+.nav-menu-line {
+  width: 18px;
+  height: 2px;
+  background: #000000;
+  transition: transform 0.18s ease, opacity 0.18s ease;
+}
+
+.nav-menu-toggle.open .nav-menu-line:nth-child(1) {
+  transform: translateY(7px) rotate(45deg);
+}
+
+.nav-menu-toggle.open .nav-menu-line:nth-child(2) {
+  opacity: 0;
+}
+
+.nav-menu-toggle.open .nav-menu-line:nth-child(3) {
+  transform: translateY(-7px) rotate(-45deg);
+}
+
 .nav-brand {
   text-decoration: none;
   color: #000000;
@@ -122,9 +162,8 @@ body {
 }
 
 .nav-auth-btn:hover,
-.nav-account-btn:hover,
 .nav-auth-btn.active,
-.nav-account-btn.active {
+.nav-auth-btn-primary.active {
   background: #000000;
   color: #ffffff;
 }
@@ -143,6 +182,70 @@ body {
   position: relative;
 }
 
+.nav-account::after {
+  content: '';
+  position: absolute;
+  top: 100%;
+  right: 0;
+  width: 100%;
+  height: 10px;
+}
+
+.nav-account:hover .nav-account-dropdown {
+  display: flex;
+}
+
+.nav-account-btn {
+  min-height: auto;
+  padding: 0;
+  border: 0;
+  background: transparent;
+  gap: 8px;
+  font-size: 22px;
+  position: relative;
+  z-index: 2;
+}
+
+.nav-account-btn::after {
+  content: '';
+  position: absolute;
+  left: 0;
+  right: 0;
+  bottom: -6px;
+  height: 2px;
+  background: #000000;
+  transform: scaleX(0);
+  transform-origin: left;
+  transition: transform 0.18s ease;
+}
+
+.nav-account-btn:hover,
+.nav-account-btn.active {
+  background: transparent;
+  color: #000000;
+}
+
+.nav-account-btn:hover::after,
+.nav-account-btn.active::after,
+.nav-account:hover .nav-account-btn::after {
+  transform: scaleX(1);
+}
+
+.nav-account-arrow {
+  width: 10px;
+  height: 10px;
+  display: inline-block;
+  border-right: 2px solid currentColor;
+  border-bottom: 2px solid currentColor;
+  transform: rotate(45deg) translateY(-1px);
+  transition: transform 0.18s ease;
+}
+
+.nav-account-arrow.open,
+.nav-account:hover .nav-account-arrow {
+  transform: rotate(225deg) translateY(-1px);
+}
+
 .nav-account-dropdown {
   position: absolute;
   right: 0;
@@ -154,6 +257,7 @@ body {
   display: flex;
   flex-direction: column;
   overflow: hidden;
+  z-index: 1;
 }
 
 .nav-account-link {
@@ -177,6 +281,19 @@ body {
 
 .nav-account-button {
   font-family: inherit;
+}
+
+.nav-account-link-danger {
+  color: #c81d25;
+}
+
+.nav-account-link-danger:hover {
+  background: #c81d25;
+  color: #ffffff;
+}
+
+.mobile-nav-panel {
+  display: none;
 }
 
 .page-title {
@@ -252,6 +369,35 @@ body {
   margin: 2px 0 0;
   font-size: 15px;
   font-weight: 700;
+}
+
+.collection-page .page-title {
+  font-size: 40px;
+}
+
+.collection-page .page-subtitle {
+  font-size: 21px;
+}
+
+.collection-page .status-text {
+  font-size: 21px;
+}
+
+.collection-page .card-title {
+  font-size: 32px;
+}
+
+.collection-page .card-meta {
+  font-size: 18px;
+  line-height: 1.35;
+}
+
+.collection-page .card-likes {
+  font-size: 17px;
+}
+
+.collection-page .show-more-btn {
+  font-size: 18px;
 }
 
 .card-heart-btn {
@@ -377,6 +523,16 @@ body {
   font-weight: 600;
 }
 
+.collection-page .modal-title,
+.home-page .modal-title {
+  font-size: 34px;
+}
+
+.collection-page .modal-status,
+.home-page .modal-status {
+  font-size: 17px;
+}
+
 .modal-content {
   display: flex;
   flex-direction: column;
@@ -464,6 +620,11 @@ body {
   font-weight: 800;
 }
 
+.collection-page .modal-section-title,
+.home-page .modal-section-title {
+  font-size: 24px;
+}
+
 .modal-info-grid {
   display: grid;
   grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
@@ -489,12 +650,29 @@ body {
   word-break: break-word;
 }
 
+.collection-page .modal-info-label,
+.home-page .modal-info-label {
+  font-size: 13px;
+}
+
+.collection-page .modal-info-value,
+.home-page .modal-info-value {
+  font-size: 17px;
+  line-height: 1.55;
+}
+
 .modal-bio {
   margin-top: 12px;
   padding-top: 10px;
   border-top: 1px solid #dddddd;
   font-size: 14px;
   line-height: 1.45;
+}
+
+.collection-page .modal-bio,
+.home-page .modal-bio {
+  font-size: 17px;
+  line-height: 1.6;
 }
 
 .modal-link {
@@ -525,6 +703,11 @@ body {
   font-weight: 700;
 }
 
+.collection-page .carousel-btn,
+.home-page .carousel-btn {
+  font-size: 16px;
+}
+
 .carousel-btn:disabled {
   opacity: 0.45;
   cursor: not-allowed;
@@ -538,6 +721,11 @@ body {
 .carousel-count {
   font-size: 13px;
   font-weight: 700;
+}
+
+.collection-page .carousel-count,
+.home-page .carousel-count {
+  font-size: 15px;
 }
 
 .carousel-grid {
@@ -581,6 +769,15 @@ body {
   line-height: 1.3;
 }
 
+.collection-page .carousel-title {
+  font-size: 20px;
+}
+
+.collection-page .carousel-meta {
+  font-size: 15px;
+  line-height: 1.45;
+}
+
 .details-list {
   display: flex;
   flex-direction: column;
@@ -606,6 +803,274 @@ body {
   margin: 0;
   font-size: 14px;
   line-height: 1.45;
+}
+
+.collection-page .details-key,
+.home-page .details-key {
+  font-size: 16px;
+}
+
+.collection-page .details-value,
+.home-page .details-value {
+  font-size: 17px;
+  line-height: 1.55;
+}
+
+.home-page,
+.about-page {
+  display: flex;
+  flex-direction: column;
+  gap: 28px;
+}
+
+.home-page .page-title,
+.about-page .page-title {
+  font-size: 42px;
+}
+
+.home-page .page-subtitle,
+.about-page .page-subtitle {
+  font-size: 21px;
+  line-height: 1.55;
+}
+
+.home-page .status-text {
+  font-size: 21px;
+}
+
+.home-hero,
+.home-about-teaser {
+  display: grid;
+  grid-template-columns: minmax(0, 1.15fr) minmax(300px, 0.85fr);
+  gap: 26px;
+  align-items: center;
+}
+
+.home-hero-media,
+.home-about-teaser {
+  border: 1px solid #000000;
+  background: #ffffff;
+}
+
+.home-hero-media {
+  overflow: hidden;
+}
+
+.home-hero-image {
+  width: 100%;
+  height: 100%;
+  min-height: 430px;
+  object-fit: cover;
+  display: block;
+}
+
+.home-hero-copy,
+.home-about-copy {
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+}
+
+.home-section-kicker {
+  margin: 0;
+  font-size: 14px;
+  font-weight: 800;
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+}
+
+.home-hero-title {
+  margin-bottom: 0;
+  font-size: 72px;
+  line-height: 0.95;
+}
+
+.home-hero-text,
+.home-about-text {
+  margin: 0;
+  font-size: 18px;
+  line-height: 1.65;
+}
+
+.home-hero-actions,
+.about-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 12px;
+}
+
+.home-action-btn,
+.home-section-btn {
+  text-decoration: none;
+}
+
+.home-section {
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+}
+
+.home-section-header {
+  display: flex;
+  align-items: end;
+  justify-content: space-between;
+  gap: 20px;
+}
+
+.home-section-title,
+.about-title {
+  margin-bottom: 0;
+}
+
+.home-section-subtitle,
+.about-subtitle {
+  margin: 0;
+}
+
+.home-section-actions {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: flex-end;
+  gap: 12px;
+}
+
+.home-section-footer {
+  display: flex;
+  justify-content: flex-end;
+}
+
+.home-carousel-controls {
+  display: flex;
+  gap: 10px;
+}
+
+.home-carousel-track {
+  display: flex;
+  gap: 18px;
+  overflow-x: auto;
+  padding-bottom: 8px;
+  scroll-snap-type: x mandatory;
+  scrollbar-width: thin;
+}
+
+.home-carousel-card {
+  flex: 0 0 320px;
+  min-width: 320px;
+  scroll-snap-align: start;
+}
+
+.home-carousel-image {
+  height: 260px;
+}
+
+.home-artist-card {
+  min-height: 280px;
+  display: flex;
+  flex-direction: column;
+  justify-content: space-between;
+}
+
+.home-artist-card-body {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+.home-artist-bio {
+  margin: 0;
+  font-size: 16px;
+  line-height: 1.55;
+}
+
+.home-about-teaser {
+  padding: 24px;
+  align-items: stretch;
+}
+
+.home-about-actions {
+  display: flex;
+  justify-content: flex-end;
+  align-items: end;
+}
+
+.about-hero {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+.about-grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 18px;
+}
+
+.about-page .modal-section-title {
+  font-size: 24px;
+}
+
+.about-page .modal-bio {
+  font-size: 17px;
+  line-height: 1.6;
+}
+
+.about-body-text {
+  margin: 0;
+}
+
+.auth-page .page-title,
+.account-page .page-title {
+  font-size: 40px;
+}
+
+.auth-page .page-subtitle,
+.account-page .page-subtitle {
+  font-size: 21px;
+}
+
+.account-page .status-text {
+  font-size: 21px;
+}
+
+.auth-page .auth-kicker {
+  font-size: 15px;
+}
+
+.auth-page .auth-label {
+  font-size: 13px;
+}
+
+.auth-page .auth-input {
+  font-size: 18px;
+  padding: 14px 16px;
+}
+
+.auth-page .auth-error,
+.auth-page .auth-footer {
+  font-size: 16px;
+}
+
+.auth-page .auth-submit-btn {
+  font-size: 18px;
+}
+
+.account-page .modal-section-title {
+  font-size: 24px;
+}
+
+.account-page .modal-info-label {
+  font-size: 13px;
+}
+
+.account-page .modal-info-value {
+  font-size: 17px;
+  line-height: 1.55;
+}
+
+.account-page .modal-bio {
+  font-size: 17px;
+  line-height: 1.6;
 }
 
 .auth-page {
@@ -711,64 +1176,156 @@ body {
 
 @media (max-width: 700px) {
   .app-shell {
-    padding-top: 148px;
+    padding-top: 120px;
   }
 
   .top-nav {
     height: auto;
     min-height: var(--top-nav-height);
-    padding: 8px 16px;
+    padding: 12px 16px;
   }
 
   .top-nav-inner {
-    display: flex;
-    flex-direction: column;
-    align-items: flex-start;
+    grid-template-columns: 1fr auto;
     height: auto;
-    gap: 10px;
+    gap: 12px;
+  }
+
+  .top-nav-left {
+    gap: 12px;
+    min-width: 0;
+  }
+
+  .nav-menu-toggle {
+    display: inline-flex;
   }
 
   .nav-brand {
     font-size: 34px;
   }
 
-  .top-nav-links {
-    width: 100%;
-    height: auto;
-  }
-
   .top-nav-auth {
-    width: 100%;
-    justify-content: stretch;
-    flex-wrap: wrap;
+    justify-content: flex-end;
+    flex-wrap: nowrap;
+    gap: 6px;
   }
 
-  .nav-auth-btn,
+  .top-nav-links {
+    display: none;
+  }
+
+  .nav-auth-btn {
+    min-height: 38px;
+    padding: 0 10px;
+    font-size: 14px;
+  }
+
+  .nav-auth-status {
+    font-size: 12px;
+  }
+
   .nav-account-btn {
-    flex: 1;
-  }
-
-  .nav-account {
-    width: 100%;
+    font-size: 18px;
   }
 
   .nav-account-dropdown {
-    position: static;
-    margin-top: 8px;
-    width: 100%;
+    top: calc(100% + 10px);
+    min-width: 200px;
+    max-width: calc(100vw - 32px);
   }
 
-  .nav-link {
+  .mobile-nav-panel {
+    display: flex;
+    flex-direction: column;
+    gap: 14px;
+    margin-top: 14px;
+    padding-top: 14px;
+    border-top: 1px solid #000000;
+  }
+
+  .mobile-nav-brand {
+    text-decoration: none;
+    color: #000000;
+    font-size: 34px;
+    font-weight: 800;
+    line-height: 1;
+  }
+
+  .mobile-nav-links {
+    display: flex;
+    flex-direction: column;
+  }
+
+  .mobile-nav-link {
+    width: 100%;
+    justify-content: flex-start;
     height: auto;
-    flex: 1;
-    text-align: center;
-    padding: 10px 12px;
-    font-size: 18px;
+    padding: 14px 0;
+    font-size: 22px;
+    border-top: 1px solid #000000;
+  }
+
+  .mobile-nav-links .mobile-nav-link:last-child {
+    border-bottom: 1px solid #000000;
   }
 
   .details-row {
     grid-template-columns: 1fr;
     gap: 4px;
+  }
+
+  .home-page .page-title,
+  .about-page .page-title {
+    font-size: 34px;
+  }
+
+  .home-hero-title {
+    font-size: 52px;
+  }
+
+  .home-page .page-subtitle,
+  .about-page .page-subtitle {
+    font-size: 18px;
+  }
+
+  .home-hero,
+  .home-about-teaser,
+  .about-grid {
+    grid-template-columns: 1fr;
+  }
+
+  .home-hero-image {
+    min-height: 280px;
+  }
+
+  .home-section-header {
+    align-items: start;
+    flex-direction: column;
+  }
+
+  .home-section-actions {
+    width: 100%;
+    justify-content: flex-start;
+  }
+
+  .home-section-footer {
+    justify-content: stretch;
+  }
+
+  .home-carousel-card {
+    flex-basis: 84vw;
+    min-width: 84vw;
+  }
+
+  .home-hero-actions,
+  .about-actions {
+    width: 100%;
+  }
+
+  .home-action-btn,
+  .home-section-btn {
+    width: 100%;
+    text-align: center;
   }
 }
 

@@ -248,7 +248,7 @@ function ArtworkPage() {
     : false
 
   return (
-    <section>
+    <section className="collection-page">
       <h1 className="page-title">Artwork</h1>
       <p className="page-subtitle">
         Showing {visibleArtwork.length} out of {artwork.length} artworks

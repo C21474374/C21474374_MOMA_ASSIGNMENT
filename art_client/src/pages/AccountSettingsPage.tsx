@@ -20,7 +20,7 @@ function formatDate(value: string | undefined) {
 function AccountSettingsPage({ user }: AccountSettingsPageProps) {
   if (!user) {
     return (
-      <section>
+      <section className="account-page">
         <h1 className="page-title">Account Settings</h1>
         <p className="page-subtitle">
           Sign in to view your saved likes and account details.
@@ -41,7 +41,7 @@ function AccountSettingsPage({ user }: AccountSettingsPageProps) {
   }
 
   return (
-    <section>
+    <section className="account-page">
       <h1 className="page-title">Account Settings</h1>
       <p className="page-subtitle">
         Review the profile information attached to your account.
