@@ -19,6 +19,7 @@ type View =
   | 'account'
 
 const AUTH_TOKEN_STORAGE_KEY = 'artapp.authToken'
+const MOBILE_NAV_BREAKPOINT = 980
 
 const PRIMARY_NAV_ITEMS: Array<{ label: string; href: string; view: View }> = [
   { label: 'Home', href: '#/home', view: 'home' },
@@ -137,7 +138,7 @@ function App() {
 
   useEffect(() => {
     const handleResize = () => {
-      if (window.innerWidth > 700) {
+      if (window.innerWidth > MOBILE_NAV_BREAKPOINT) {
         setMobileNavOpen(false)
       }
     }
@@ -147,6 +148,36 @@ function App() {
       window.removeEventListener('resize', handleResize)
     }
   }, [])
+
+  useEffect(() => {
+    if (!mobileNavOpen) {
+      document.body.style.overflow = ''
+      return
+    }
+
+    document.body.style.overflow = 'hidden'
+
+    return () => {
+      document.body.style.overflow = ''
+    }
+  }, [mobileNavOpen])
+
+  useEffect(() => {
+    if (!mobileNavOpen) {
+      return
+    }
+
+    const handleKeyDown = (event: KeyboardEvent) => {
+      if (event.key === 'Escape') {
+        setMobileNavOpen(false)
+      }
+    }
+
+    window.addEventListener('keydown', handleKeyDown)
+    return () => {
+      window.removeEventListener('keydown', handleKeyDown)
+    }
+  }, [mobileNavOpen])
 
   useEffect(() => {
     const handlePointerDown = (event: MouseEvent) => {
@@ -320,8 +351,16 @@ function App() {
           </div>
         </div>
 
-        {mobileNavOpen && (
-          <div className="mobile-nav-panel">
+        <div
+          className={`mobile-nav-backdrop ${mobileNavOpen ? 'open' : ''}`}
+          onClick={() => setMobileNavOpen(false)}
+          aria-hidden={!mobileNavOpen}
+        />
+        <aside
+          className={`mobile-nav-panel ${mobileNavOpen ? 'open' : ''}`}
+          aria-hidden={!mobileNavOpen}
+        >
+          <div className="mobile-nav-panel-header">
             <a
               href="#/home"
               className="mobile-nav-brand"
@@ -329,11 +368,21 @@ function App() {
             >
               MoMA
             </a>
-            <nav className="mobile-nav-links" aria-label="Mobile Primary">
-              {renderPrimaryNav('nav-link mobile-nav-link', () => setMobileNavOpen(false))}
-            </nav>
+            <button
+              type="button"
+              className="nav-menu-toggle mobile-nav-close open"
+              aria-label="Close navigation menu"
+              onClick={() => setMobileNavOpen(false)}
+            >
+              <span className="nav-menu-line" />
+              <span className="nav-menu-line" />
+              <span className="nav-menu-line" />
+            </button>
           </div>
-        )}
+          <nav className="mobile-nav-links" aria-label="Mobile Primary">
+            {renderPrimaryNav('nav-link mobile-nav-link', () => setMobileNavOpen(false))}
+          </nav>
+        </aside>
       </header>
 
       <div className="app-shell">
