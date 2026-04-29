@@ -1,9 +1,32 @@
-import { useEffect, useState } from 'react'
+import { useEffect, useMemo, useState } from 'react'
 import type { MouseEvent } from 'react'
 import CrudFormModal, { type CrudFormField } from '../components/CrudFormModal'
 import DetailsModal from '../components/DetailsModal'
 
 const PAGE_SIZE = 50
+
+const ARTWORK_HIDDEN_FIELDS = new Set([
+  '_id',
+  'Title',
+  'Artist',
+  'Date',
+  'Medium',
+  'Classification',
+  'Department',
+  'Dimensions',
+  'Height (cm)',
+  'Width (cm)',
+  'Depth (cm)',
+  'CreditLine',
+  'AccessionNumber',
+  'DateAcquired',
+  'Cataloged',
+  'ObjectID',
+  'URL',
+  'ImageURL',
+  'OnView',
+  'Likes',
+])
 
 type Artwork = {
   _id: string
@@ -96,6 +119,7 @@ const EMPTY_ARTWORK_FORM_VALUES: ArtworkFormValues = {
   CreditLine: '',
 }
 
+// Normalize text-like values for text inputs in the artwork form.
 function getTextInputValue(value: unknown) {
   if (value === null || value === undefined) {
     return ''
@@ -106,6 +130,7 @@ function getTextInputValue(value: unknown) {
   return String(value)
 }
 
+// Normalize numeric values for number inputs in the artwork form.
 function getNumberInputValue(value: unknown) {
   if (typeof value === 'number' && Number.isFinite(value)) {
     return String(value)
@@ -116,6 +141,7 @@ function getNumberInputValue(value: unknown) {
   return ''
 }
 
+// Convert a selected artwork record into the editable artwork form shape.
 function getArtworkFormValues(item: Artwork | null): ArtworkFormValues {
   if (!item) {
     return { ...EMPTY_ARTWORK_FORM_VALUES }
@@ -138,6 +164,7 @@ function getArtworkFormValues(item: Artwork | null): ArtworkFormValues {
   }
 }
 
+// Parse optional numeric form fields while keeping validation feedback user-friendly.
 function parseOptionalNumberField(value: string, label: string) {
   const trimmedValue = value.trim()
   if (!trimmedValue) {
@@ -152,6 +179,7 @@ function parseOptionalNumberField(value: string, label: string) {
   return parsedValue
 }
 
+// Build the payload sent to the artwork API from the browser form values.
 function buildArtworkPayload(values: ArtworkFormValues, isCreate: boolean) {
   const title = values.Title.trim()
   if (!title) {
@@ -184,6 +212,7 @@ function buildArtworkPayload(values: ArtworkFormValues, isCreate: boolean) {
   return payload
 }
 
+// Format detail values for artwork modals and fallback rows.
 function asDisplayValue(value: unknown) {
   if (value === null || value === undefined || value === '') {
     return 'N/A'
@@ -197,6 +226,7 @@ function asDisplayValue(value: unknown) {
   return String(value)
 }
 
+// Turn the artwork artist field into a readable label for cards and modals.
 function getArtistLabel(artist: Artwork['Artist']) {
   if (Array.isArray(artist)) {
     return artist.filter(Boolean).join(', ')
@@ -207,6 +237,17 @@ function getArtistLabel(artist: Artwork['Artist']) {
   return 'Unknown artist'
 }
 
+// Normalize free-text values before applying browser-side search filters.
+function normalizeSearchValue(value: unknown) {
+  if (Array.isArray(value)) {
+    return value.join(', ').trim().toLowerCase()
+  }
+  return String(value ?? '')
+    .trim()
+    .toLowerCase()
+}
+
+// Render a label/value row inside artwork detail modals.
 function ArtworkInfoRow({
   label,
   value,
@@ -222,9 +263,13 @@ function ArtworkInfoRow({
   )
 }
 
+// Render the main artwork collection page, including filters, CRUD actions, and detail flows.
 function ArtworkPage() {
   const [artwork, setArtwork] = useState<Artwork[]>([])
   const [visibleCount, setVisibleCount] = useState(PAGE_SIZE)
+  const [searchTerm, setSearchTerm] = useState('')
+  const [departmentFilter, setDepartmentFilter] = useState('')
+  const [viewFilter, setViewFilter] = useState('')
   const [likedArtworkIds, setLikedArtworkIds] = useState<Set<string>>(new Set())
   const [selectedArtwork, setSelectedArtwork] = useState<Artwork | null>(null)
   const [detailsLoading, setDetailsLoading] = useState(false)
@@ -242,6 +287,7 @@ function ArtworkPage() {
   useEffect(() => {
     let isMounted = true
 
+    // Load the artwork dataset used by the main collection page.
     const loadArtwork = async () => {
       try {
         setLoading(true)
@@ -278,14 +324,65 @@ function ArtworkPage() {
     }
   }, [])
 
-  const visibleArtwork = artwork.slice(0, visibleCount)
-  const canShowMore = visibleCount < artwork.length
+  useEffect(() => {
+    setVisibleCount(PAGE_SIZE)
+  }, [departmentFilter, searchTerm, viewFilter])
 
+  // Build the department filter options from the current dataset.
+  const departmentOptions = useMemo(() => {
+    return Array.from(
+      new Set(
+        artwork
+          .map((item) => String(item.Department ?? '').trim())
+          .filter(Boolean)
+      )
+    ).sort((a, b) => a.localeCompare(b))
+  }, [artwork])
+
+  // Build the on-view filter options from the current dataset.
+  const viewOptions = useMemo(() => {
+    return Array.from(
+      new Set(
+        artwork
+          .map((item) => String(item.OnView ?? '').trim())
+          .filter(Boolean)
+      )
+    ).sort((a, b) => a.localeCompare(b))
+  }, [artwork])
+
+  // Apply browser-side search and dropdown filters before pagination.
+  const filteredArtwork = useMemo(() => {
+    const normalizedSearch = searchTerm.trim().toLowerCase()
+
+    return artwork.filter((item) => {
+      const matchesSearch =
+        normalizedSearch.length === 0 ||
+        normalizeSearchValue(item.Title).includes(normalizedSearch) ||
+        normalizeSearchValue(item.Artist).includes(normalizedSearch) ||
+        normalizeSearchValue(item.Medium).includes(normalizedSearch) ||
+        normalizeSearchValue(item.Classification).includes(normalizedSearch)
+
+      const matchesDepartment =
+        departmentFilter.length === 0 ||
+        String(item.Department ?? '').trim() === departmentFilter
+
+      const matchesView =
+        viewFilter.length === 0 || String(item.OnView ?? '').trim() === viewFilter
+
+      return matchesSearch && matchesDepartment && matchesView
+    })
+  }, [artwork, departmentFilter, searchTerm, viewFilter])
+
+  const visibleArtwork = filteredArtwork.slice(0, visibleCount)
+  const canShowMore = visibleCount < filteredArtwork.length
+
+  // Close the artwork detail modal.
   const closeDetails = () => {
     setSelectedArtwork(null)
     setDetailsLoading(false)
   }
 
+  // Reset and close the shared artwork create/edit modal.
   const closeArtworkEditor = () => {
     setArtworkEditorMode(null)
     setArtworkEditorValues({ ...EMPTY_ARTWORK_FORM_VALUES })
@@ -293,18 +390,21 @@ function ArtworkPage() {
     setArtworkEditorSubmitting(false)
   }
 
+  // Open the artwork modal in create mode with empty defaults.
   const openCreateArtworkEditor = () => {
     setArtworkEditorMode('create')
     setArtworkEditorValues({ ...EMPTY_ARTWORK_FORM_VALUES })
     setArtworkEditorError('')
   }
 
+  // Open the artwork modal in edit mode using the selected record.
   const openEditArtworkEditor = (item: Artwork) => {
     setArtworkEditorMode('edit')
     setArtworkEditorValues(getArtworkFormValues(item))
     setArtworkEditorError('')
   }
 
+  // Send create or update requests for artwork records from the shared editor modal.
   const handleArtworkEditorSubmit = async (values: Record<string, string>) => {
     const isCreate = artworkEditorMode === 'create'
     const targetArtwork = isCreate ? null : selectedArtwork
@@ -357,6 +457,7 @@ function ArtworkPage() {
     }
   }
 
+  // Delete the selected artwork after a browser confirmation step.
   const handleDeleteArtwork = async () => {
     if (!selectedArtwork) {
       return
@@ -390,6 +491,7 @@ function ArtworkPage() {
     }
   }
 
+  // Load the full artwork record for the selected card.
   const openArtworkDetails = async (item: Artwork) => {
     setSelectedArtwork(item)
     setDetailsLoading(true)
@@ -409,6 +511,7 @@ function ArtworkPage() {
     }
   }
 
+  // Optimistically toggle likes for artwork and persist the new count through the API.
   const handleLike = async (event: MouseEvent<HTMLButtonElement>, item: Artwork) => {
     event.stopPropagation()
 
@@ -482,30 +585,7 @@ function ArtworkPage() {
     selectedArtwork === null
       ? []
       : Object.entries(selectedArtwork).filter(([key, value]) => {
-          const hiddenKeys = new Set([
-            '_id',
-            'Title',
-            'Artist',
-            'Date',
-            'Medium',
-            'Classification',
-            'Department',
-            'Dimensions',
-            'Height (cm)',
-            'Width (cm)',
-            'Depth (cm)',
-            'CreditLine',
-            'AccessionNumber',
-            'DateAcquired',
-            'Cataloged',
-            'ObjectID',
-            'URL',
-            'ImageURL',
-            'OnView',
-            'Likes',
-          ])
-
-          if (hiddenKeys.has(key)) {
+          if (ARTWORK_HIDDEN_FIELDS.has(key)) {
             return false
           }
 
@@ -521,17 +601,53 @@ function ArtworkPage() {
         <div>
           <h1 className="page-title">Artwork</h1>
           <p className="page-subtitle">
-            Showing {visibleArtwork.length} out of {artwork.length} artworks
+            Showing {visibleArtwork.length} out of {filteredArtwork.length} artworks
           </p>
         </div>
-        <div className="collection-header-actions">
-          <button
-            type="button"
-            className="collection-action-btn"
-            onClick={openCreateArtworkEditor}
+        <div className="collection-toolbar">
+          <input
+            type="search"
+            className="collection-search-input"
+            placeholder="Search artwork"
+            aria-label="Search artwork"
+            value={searchTerm}
+            onChange={(event) => setSearchTerm(event.target.value)}
+          />
+          <select
+            className="collection-filter-select"
+            aria-label="Filter artwork by department"
+            value={departmentFilter}
+            onChange={(event) => setDepartmentFilter(event.target.value)}
           >
-            Add Artwork
-          </button>
+            <option value="">All Departments</option>
+            {departmentOptions.map((option) => (
+              <option key={option} value={option}>
+                {option}
+              </option>
+            ))}
+          </select>
+          <select
+            className="collection-filter-select"
+            aria-label="Filter artwork by view status"
+            value={viewFilter}
+            onChange={(event) => setViewFilter(event.target.value)}
+          >
+            <option value="">All View Status</option>
+            {viewOptions.map((option) => (
+              <option key={option} value={option}>
+                {option}
+              </option>
+            ))}
+          </select>
+          <div className="collection-header-actions">
+            <button
+              type="button"
+              className="collection-action-btn"
+              onClick={openCreateArtworkEditor}
+            >
+              Add Artwork
+            </button>
+          </div>
         </div>
       </div>
       <div className="card-grid">

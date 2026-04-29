@@ -8,6 +8,7 @@ const {
   sanitizeUser,
 } = require("../utils/users");
 
+// Validate a route id param and convert it to ObjectId.
 function parseObjectId(id) {
   if (!mongoose.Types.ObjectId.isValid(id)) {
     return null;
@@ -16,6 +17,7 @@ function parseObjectId(id) {
   return new mongoose.Types.ObjectId(id);
 }
 
+// Package a signed JWT together with the safe user payload returned to the client.
 function buildAuthResponse(user) {
   return {
     token: signAuthToken(user),
@@ -23,6 +25,7 @@ function buildAuthResponse(user) {
   };
 }
 
+// Create a new account, hash the password, and return the signed session payload.
 async function register(req, res) {
   try {
     const usersCollection = getUsersCollection();
@@ -74,6 +77,7 @@ async function register(req, res) {
   }
 }
 
+// Verify user credentials and return a signed session payload for the matched account.
 async function login(req, res) {
   try {
     const usersCollection = getUsersCollection();
@@ -101,6 +105,7 @@ async function login(req, res) {
   }
 }
 
+// Resolve the currently authenticated user from the bearer token payload.
 async function getCurrentUser(req, res) {
   try {
     const usersCollection = getUsersCollection();

@@ -10,6 +10,7 @@ type DetailsModalProps = {
   onClose: () => void
 }
 
+// Format fallback detail values when a page does not provide a custom modal body.
 function formatValue(value: unknown): string {
   if (value === null || value === undefined) {
     return 'N/A'
@@ -35,6 +36,7 @@ function formatValue(value: unknown): string {
   return String(value)
 }
 
+// Render a reusable overlay for artwork, artist, and account detail views.
 function DetailsModal({
   title,
   item,

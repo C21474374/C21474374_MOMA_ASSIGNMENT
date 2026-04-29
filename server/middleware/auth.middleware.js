@@ -1,5 +1,6 @@
 const { verifyAuthToken } = require("../utils/authToken");
 
+// Extract the bearer token value from an Authorization header.
 function getBearerToken(authorizationHeader) {
   if (typeof authorizationHeader !== "string") {
     return null;
@@ -13,6 +14,7 @@ function getBearerToken(authorizationHeader) {
   return token.trim();
 }
 
+// Guard protected routes by validating the JWT and attaching user info to the request.
 function requireAuth(req, res, next) {
   const token = getBearerToken(req.headers.authorization);
   if (!token) {

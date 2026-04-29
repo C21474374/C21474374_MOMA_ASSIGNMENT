@@ -8,12 +8,14 @@ type LoginPageProps = {
   onAuthSuccess: (response: AuthResponse) => void
 }
 
+// Submit credentials to the auth API and hand the session back to the app shell.
 function LoginPage({ onAuthSuccess }: LoginPageProps) {
   const [email, setEmail] = useState('')
   const [password, setPassword] = useState('')
   const [submitting, setSubmitting] = useState(false)
   const [error, setError] = useState('')
 
+  // Submit the login form and surface API validation errors back into the page.
   const handleSubmit = async (event: FormEvent<HTMLFormElement>) => {
     event.preventDefault()
     setSubmitting(true)

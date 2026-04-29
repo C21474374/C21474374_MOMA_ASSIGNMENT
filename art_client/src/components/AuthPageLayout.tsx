@@ -6,6 +6,7 @@ type AuthPageLayoutProps = {
   children: ReactNode
 }
 
+// Provide a shared frame for the login and registration experiences.
 function AuthPageLayout({ title, subtitle, children }: AuthPageLayoutProps) {
   return (
     <section className="auth-page">

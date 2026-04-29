@@ -27,6 +27,7 @@ const PRIMARY_NAV_ITEMS: Array<{ label: string; href: string; view: View }> = [
   { label: 'About', href: '#/about', view: 'about' },
 ]
 
+// Translate the current hash URL into the view name used by the app shell.
 function parseViewFromHash(hash: string): View {
   const value = hash.replace(/^#\/?/, '').toLowerCase()
   if (value === 'home') {
@@ -53,6 +54,7 @@ function parseViewFromHash(hash: string): View {
   return 'home'
 }
 
+// Coordinate top-level navigation, auth session state, and shared layout pieces.
 function App() {
   const [view, setView] = useState<View>(() => parseViewFromHash(window.location.hash))
   const [authUser, setAuthUser] = useState<AuthUser | null>(null)
@@ -91,6 +93,7 @@ function App() {
       }
     }
 
+    // Restore the saved session when the app boots with a token in local storage.
     const loadCurrentUser = async () => {
       try {
         const currentUser = await getCurrentUser(authToken)
@@ -158,6 +161,7 @@ function App() {
     }
   }, [])
 
+  // Persist a successful auth response and move the user into their account view.
   const handleAuthSuccess = (response: AuthResponse) => {
     setAuthUser(response.user)
     setAuthToken(response.token)
@@ -167,6 +171,7 @@ function App() {
     window.location.hash = '/account'
   }
 
+  // Clear the current session from memory and local storage.
   const handleLogout = () => {
     setAuthUser(null)
     setAuthToken(null)
@@ -178,6 +183,7 @@ function App() {
 
   const accountLabel = authUser?.displayName?.trim() || authUser?.email || 'Account'
 
+  // Render the shared navigation links for both desktop and mobile layouts.
   const renderPrimaryNav = (className: string, onNavigate?: () => void) =>
     PRIMARY_NAV_ITEMS.map((item) => (
       <a
@@ -190,6 +196,7 @@ function App() {
       </a>
     ))
 
+  // Pick the page component that matches the current hash-based route.
   const page = useMemo(() => {
     if (view === 'home') {
       return <HomePage />

@@ -6,6 +6,43 @@ import DetailsModal from '../components/DetailsModal'
 const PAGE_SIZE = 50
 const CAROUSEL_PAGE_SIZE = 3
 
+const ARTIST_HIDDEN_FIELDS = new Set([
+  '_id',
+  'DisplayName',
+  'ArtistBio',
+  'Nationality',
+  'Gender',
+  'BeginDate',
+  'EndDate',
+  'ConstituentID',
+  'ULAN',
+  'Wiki QID',
+  'Likes',
+])
+
+const ARTWORK_HIDDEN_FIELDS = new Set([
+  '_id',
+  'Title',
+  'Artist',
+  'Date',
+  'Medium',
+  'Classification',
+  'Department',
+  'Dimensions',
+  'Height (cm)',
+  'Width (cm)',
+  'Depth (cm)',
+  'CreditLine',
+  'AccessionNumber',
+  'DateAcquired',
+  'Cataloged',
+  'ObjectID',
+  'URL',
+  'ImageURL',
+  'OnView',
+  'Likes',
+])
+
 type Artist = {
   _id: string
   DisplayName?: string
@@ -98,6 +135,7 @@ const EMPTY_ARTIST_FORM_VALUES: ArtistFormValues = {
   'Wiki QID': '',
 }
 
+// Normalize text-like values for text inputs in the artist form.
 function getTextInputValue(value: unknown) {
   if (value === null || value === undefined) {
     return ''
@@ -108,6 +146,7 @@ function getTextInputValue(value: unknown) {
   return String(value)
 }
 
+// Normalize numeric values for number inputs in the artist form.
 function getNumberInputValue(value: unknown) {
   if (typeof value === 'number' && Number.isFinite(value)) {
     return String(value)
@@ -118,6 +157,7 @@ function getNumberInputValue(value: unknown) {
   return ''
 }
 
+// Convert a selected artist record into the editable artist form shape.
 function getArtistFormValues(artist: Artist | null): ArtistFormValues {
   if (!artist) {
     return { ...EMPTY_ARTIST_FORM_VALUES }
@@ -136,6 +176,7 @@ function getArtistFormValues(artist: Artist | null): ArtistFormValues {
   }
 }
 
+// Parse optional numeric form fields while keeping validation feedback user-friendly.
 function parseOptionalNumberField(value: string, label: string) {
   const trimmedValue = value.trim()
   if (!trimmedValue) {
@@ -150,6 +191,7 @@ function parseOptionalNumberField(value: string, label: string) {
   return parsedValue
 }
 
+// Build the payload sent to the artists API from the browser form values.
 function buildArtistPayload(values: ArtistFormValues, isCreate: boolean) {
   const displayName = values.DisplayName.trim()
   if (!displayName) {
@@ -175,6 +217,7 @@ function buildArtistPayload(values: ArtistFormValues, isCreate: boolean) {
   return payload
 }
 
+// Format detail values for modals and fallback rows.
 function asDisplayValue(value: unknown) {
   if (value === null || value === undefined || value === '') {
     return 'N/A'
@@ -188,6 +231,7 @@ function asDisplayValue(value: unknown) {
   return String(value)
 }
 
+// Turn the artwork artist field into a readable label for cards and modals.
 function getArtistLabel(artist: ArtworkSummary['Artist']) {
   if (Array.isArray(artist)) {
     return artist.filter(Boolean).join(', ')
@@ -198,6 +242,14 @@ function getArtistLabel(artist: ArtworkSummary['Artist']) {
   return 'Unknown artist'
 }
 
+// Normalize free-text values before applying browser-side search filters.
+function normalizeSearchValue(value: unknown) {
+  return String(value ?? '')
+    .trim()
+    .toLowerCase()
+}
+
+// Render a label/value row inside artist and related-artwork modals.
 function ArtistInfoRow({
   label,
   value,
@@ -213,6 +265,7 @@ function ArtistInfoRow({
   )
 }
 
+// Check whether an artwork item references the same artist by constituent id.
 function hasMatchingConstituent(
   artworkConstituent: number[] | number | undefined,
   artistConstituent: number
@@ -228,6 +281,7 @@ function hasMatchingConstituent(
   return false
 }
 
+// Check whether an artwork item references the same artist by display name.
 function hasMatchingArtistName(
   artworkArtist: string[] | string | undefined,
   artistName: string
@@ -249,9 +303,13 @@ function hasMatchingArtistName(
   return false
 }
 
+// Render the main artists collection page, including filters, CRUD actions, and detail flows.
 function ArtistsPage() {
   const [artists, setArtists] = useState<Artist[]>([])
   const [visibleCount, setVisibleCount] = useState(PAGE_SIZE)
+  const [searchTerm, setSearchTerm] = useState('')
+  const [nationalityFilter, setNationalityFilter] = useState('')
+  const [genderFilter, setGenderFilter] = useState('')
   const [likedArtistIds, setLikedArtistIds] = useState<Set<string>>(new Set())
   const [selectedArtist, setSelectedArtist] = useState<Artist | null>(null)
   const [detailsLoading, setDetailsLoading] = useState(false)
@@ -278,6 +336,7 @@ function ArtistsPage() {
   useEffect(() => {
     let isMounted = true
 
+    // Load the artist dataset used by the main collection page.
     const loadArtists = async () => {
       try {
         setLoading(true)
@@ -314,9 +373,58 @@ function ArtistsPage() {
     }
   }, [])
 
-  const visibleArtists = artists.slice(0, visibleCount)
-  const canShowMore = visibleCount < artists.length
+  useEffect(() => {
+    setVisibleCount(PAGE_SIZE)
+  }, [searchTerm, nationalityFilter, genderFilter])
 
+  // Build the nationality filter options from the current dataset.
+  const nationalityOptions = useMemo(() => {
+    return Array.from(
+      new Set(
+        artists
+          .map((artist) => String(artist.Nationality ?? '').trim())
+          .filter(Boolean)
+      )
+    ).sort((a, b) => a.localeCompare(b))
+  }, [artists])
+
+  // Build the gender filter options from the current dataset.
+  const genderOptions = useMemo(() => {
+    return Array.from(
+      new Set(
+        artists
+          .map((artist) => String(artist.Gender ?? '').trim())
+          .filter(Boolean)
+      )
+    ).sort((a, b) => a.localeCompare(b))
+  }, [artists])
+
+  // Apply browser-side search and dropdown filters before pagination.
+  const filteredArtists = useMemo(() => {
+    const normalizedSearch = searchTerm.trim().toLowerCase()
+
+    return artists.filter((artist) => {
+      const matchesSearch =
+        normalizedSearch.length === 0 ||
+        normalizeSearchValue(artist.DisplayName).includes(normalizedSearch) ||
+        normalizeSearchValue(artist.ArtistBio).includes(normalizedSearch) ||
+        normalizeSearchValue(artist.Nationality).includes(normalizedSearch)
+
+      const matchesNationality =
+        nationalityFilter.length === 0 ||
+        String(artist.Nationality ?? '').trim() === nationalityFilter
+
+      const matchesGender =
+        genderFilter.length === 0 || String(artist.Gender ?? '').trim() === genderFilter
+
+      return matchesSearch && matchesNationality && matchesGender
+    })
+  }, [artists, genderFilter, nationalityFilter, searchTerm])
+
+  const visibleArtists = filteredArtists.slice(0, visibleCount)
+  const canShowMore = visibleCount < filteredArtists.length
+
+  // Close the artist detail flow and clear related artwork state.
   const closeDetails = () => {
     setSelectedArtist(null)
     setSelectedRelatedArtwork(null)
@@ -327,6 +435,7 @@ function ArtistsPage() {
     setCarouselPage(0)
   }
 
+  // Reset and close the shared artist create/edit modal.
   const closeArtistEditor = () => {
     setArtistEditorMode(null)
     setArtistEditorValues({ ...EMPTY_ARTIST_FORM_VALUES })
@@ -334,18 +443,21 @@ function ArtistsPage() {
     setArtistEditorSubmitting(false)
   }
 
+  // Open the artist modal in create mode with empty defaults.
   const openCreateArtistEditor = () => {
     setArtistEditorMode('create')
     setArtistEditorValues({ ...EMPTY_ARTIST_FORM_VALUES })
     setArtistEditorError('')
   }
 
+  // Open the artist modal in edit mode using the selected record.
   const openEditArtistEditor = (artist: Artist) => {
     setArtistEditorMode('edit')
     setArtistEditorValues(getArtistFormValues(artist))
     setArtistEditorError('')
   }
 
+  // Send create or update requests for artist records from the shared editor modal.
   const handleArtistEditorSubmit = async (values: Record<string, string>) => {
     const isCreate = artistEditorMode === 'create'
     const targetArtist = isCreate ? null : selectedArtist
@@ -398,6 +510,7 @@ function ArtistsPage() {
     }
   }
 
+  // Delete the selected artist after a browser confirmation step.
   const handleDeleteArtist = async () => {
     if (!selectedArtist) {
       return
@@ -431,6 +544,7 @@ function ArtistsPage() {
     }
   }
 
+  // Load the full artist record and related artwork for the selected card.
   const openArtistDetails = async (artist: Artist) => {
     setSelectedArtist(artist)
     setSelectedRelatedArtwork(null)
@@ -485,6 +599,7 @@ function ArtistsPage() {
     }
   }
 
+  // Load a full artwork record from the related-artwork carousel inside the artist modal.
   const openRelatedArtworkDetails = async (item: ArtworkSummary) => {
     setSelectedRelatedArtwork(item)
     setRelatedDetailsLoading(true)
@@ -507,11 +622,13 @@ function ArtistsPage() {
     }
   }
 
+  // Return from a nested related-artwork detail view back to the parent artist modal.
   const goBackToArtistDetails = () => {
     setSelectedRelatedArtwork(null)
     setRelatedDetailsLoading(false)
   }
 
+  // Optimistically toggle likes for an artist and persist the new count through the API.
   const handleLike = async (event: MouseEvent<HTMLButtonElement>, artist: Artist) => {
     event.stopPropagation()
 
@@ -577,6 +694,7 @@ function ArtistsPage() {
     }
   }
 
+  // Optimistically toggle likes for artwork displayed inside the artist detail flow.
   const handleRelatedArtworkLike = async (
     event: MouseEvent<HTMLButtonElement>,
     item: ArtworkSummary
@@ -643,6 +761,7 @@ function ArtistsPage() {
     }
   }
 
+  // Keep the related-artwork carousel paging in sync with the current results.
   const carouselMaxPage = useMemo(() => {
     if (relatedArtwork.length === 0) {
       return 0
@@ -650,6 +769,7 @@ function ArtistsPage() {
     return Math.ceil(relatedArtwork.length / CAROUSEL_PAGE_SIZE) - 1
   }, [relatedArtwork.length])
 
+  // Slice the current page of related artwork for the artist modal carousel.
   const carouselItems = useMemo(() => {
     const start = carouselPage * CAROUSEL_PAGE_SIZE
     return relatedArtwork.slice(start, start + CAROUSEL_PAGE_SIZE)
@@ -667,21 +787,7 @@ function ArtistsPage() {
     selectedArtist === null
       ? []
       : Object.entries(selectedArtist).filter(([key, value]) => {
-          const hiddenKeys = new Set([
-            '_id',
-            'DisplayName',
-            'ArtistBio',
-            'Nationality',
-            'Gender',
-            'BeginDate',
-            'EndDate',
-            'ConstituentID',
-            'ULAN',
-            'Wiki QID',
-            'Likes',
-          ])
-
-          if (hiddenKeys.has(key)) {
+          if (ARTIST_HIDDEN_FIELDS.has(key)) {
             return false
           }
 
@@ -692,30 +798,7 @@ function ArtistsPage() {
     selectedRelatedArtwork === null
       ? []
       : Object.entries(selectedRelatedArtwork).filter(([key, value]) => {
-          const hiddenKeys = new Set([
-            '_id',
-            'Title',
-            'Artist',
-            'Date',
-            'Medium',
-            'Classification',
-            'Department',
-            'Dimensions',
-            'Height (cm)',
-            'Width (cm)',
-            'Depth (cm)',
-            'CreditLine',
-            'AccessionNumber',
-            'DateAcquired',
-            'Cataloged',
-            'ObjectID',
-            'URL',
-            'ImageURL',
-            'OnView',
-            'Likes',
-          ])
-
-          if (hiddenKeys.has(key)) {
+          if (ARTWORK_HIDDEN_FIELDS.has(key)) {
             return false
           }
 
@@ -734,17 +817,53 @@ function ArtistsPage() {
         <div>
           <h1 className="page-title">Artists</h1>
           <p className="page-subtitle">
-            Showing {visibleArtists.length} out of {artists.length} artists
+            Showing {visibleArtists.length} out of {filteredArtists.length} artists
           </p>
         </div>
-        <div className="collection-header-actions">
-          <button
-            type="button"
-            className="collection-action-btn"
-            onClick={openCreateArtistEditor}
+        <div className="collection-toolbar">
+          <input
+            type="search"
+            className="collection-search-input"
+            placeholder="Search artists"
+            aria-label="Search artists"
+            value={searchTerm}
+            onChange={(event) => setSearchTerm(event.target.value)}
+          />
+          <select
+            className="collection-filter-select"
+            aria-label="Filter artists by nationality"
+            value={nationalityFilter}
+            onChange={(event) => setNationalityFilter(event.target.value)}
           >
-            Add Artist
-          </button>
+            <option value="">All Nationalities</option>
+            {nationalityOptions.map((option) => (
+              <option key={option} value={option}>
+                {option}
+              </option>
+            ))}
+          </select>
+          <select
+            className="collection-filter-select"
+            aria-label="Filter artists by gender"
+            value={genderFilter}
+            onChange={(event) => setGenderFilter(event.target.value)}
+          >
+            <option value="">All Genders</option>
+            {genderOptions.map((option) => (
+              <option key={option} value={option}>
+                {option}
+              </option>
+            ))}
+          </select>
+          <div className="collection-header-actions">
+            <button
+              type="button"
+              className="collection-action-btn"
+              onClick={openCreateArtistEditor}
+            >
+              Add Artist
+            </button>
+          </div>
         </div>
       </div>
       <div className="card-grid">

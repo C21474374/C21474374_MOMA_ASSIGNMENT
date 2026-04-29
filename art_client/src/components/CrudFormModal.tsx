@@ -21,6 +21,7 @@ type CrudFormModalProps = {
   onSubmit: (values: Record<string, string>) => void | Promise<void>
 }
 
+// Render a reusable modal form for create and edit flows on collection pages.
 function CrudFormModal({
   isOpen,
   title,
@@ -63,6 +64,7 @@ function CrudFormModal({
     return null
   }
 
+  // Pass the current modal form state back to the parent page handler.
   const handleSubmit = async (event: FormEvent<HTMLFormElement>) => {
     event.preventDefault()
     await onSubmit(formValues)

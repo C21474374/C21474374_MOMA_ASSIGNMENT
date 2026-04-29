@@ -4,6 +4,7 @@ const JSON_HEADERS = {
   'Content-Type': 'application/json',
 }
 
+// Safely parse JSON only when the server actually returned a JSON payload.
 async function parseResponseJson<T>(response: Response) {
   const contentType = response.headers.get('content-type') || ''
   if (!contentType.includes('application/json')) {
@@ -13,6 +14,7 @@ async function parseResponseJson<T>(response: Response) {
   return (await response.json()) as T
 }
 
+// Wrap fetch so auth requests share the same JSON parsing and error handling rules.
 async function requestJson<T>(input: RequestInfo | URL, init?: RequestInit) {
   const response = await fetch(input, init)
   const payload = await parseResponseJson<{ error?: string } & T>(response)
@@ -28,6 +30,7 @@ async function requestJson<T>(input: RequestInfo | URL, init?: RequestInit) {
   return payload as T
 }
 
+// Call the register endpoint and return the auth session payload.
 export async function registerUser(input: {
   email: string
   password: string
@@ -40,6 +43,7 @@ export async function registerUser(input: {
   })
 }
 
+// Call the login endpoint and return the auth session payload.
 export async function loginUser(input: { email: string; password: string }) {
   return requestJson<AuthResponse>('/api/auth/login', {
     method: 'POST',
@@ -48,6 +52,7 @@ export async function loginUser(input: { email: string; password: string }) {
   })
 }
 
+// Resolve the currently logged-in user for an existing bearer token.
 export async function getCurrentUser(token: string) {
   const response = await requestJson<CurrentUserResponse>('/api/auth/me', {
     headers: {

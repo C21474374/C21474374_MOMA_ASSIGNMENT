@@ -4,6 +4,7 @@ type AccountSettingsPageProps = {
   user: AuthUser | null
 }
 
+// Format stored account timestamps for the settings screen.
 function formatDate(value: string | undefined) {
   if (!value) {
     return 'N/A'
@@ -17,6 +18,7 @@ function formatDate(value: string | undefined) {
   return parsedDate.toLocaleString()
 }
 
+// Show the current account profile and like totals, or sign-in prompts when logged out.
 function AccountSettingsPage({ user }: AccountSettingsPageProps) {
   if (!user) {
     return (

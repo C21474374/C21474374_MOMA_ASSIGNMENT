@@ -1,3 +1,4 @@
+// Explain the purpose and direction of the MoMA collection experience.
 function AboutPage() {
   return (
     <section className="about-page">

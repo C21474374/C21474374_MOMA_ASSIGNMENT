@@ -1,6 +1,7 @@
 const mongoose = require("mongoose");
 const parseLimit = require("../../utils/parseLimit");
 
+// Access the artists collection once the shared MongoDB connection is ready.
 function getArtistsCollection() {
   if (!mongoose.connection.db) {
     throw new Error("Database connection is not ready.");

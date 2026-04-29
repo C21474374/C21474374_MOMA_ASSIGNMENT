@@ -8,6 +8,7 @@ type RegisterPageProps = {
   onAuthSuccess: (response: AuthResponse) => void
 }
 
+// Collect new account details, validate them, and register the user through the auth API.
 function RegisterPage({ onAuthSuccess }: RegisterPageProps) {
   const [displayName, setDisplayName] = useState('')
   const [email, setEmail] = useState('')
@@ -16,6 +17,7 @@ function RegisterPage({ onAuthSuccess }: RegisterPageProps) {
   const [submitting, setSubmitting] = useState(false)
   const [error, setError] = useState('')
 
+  // Submit the registration form after checking the password confirmation locally.
   const handleSubmit = async (event: FormEvent<HTMLFormElement>) => {
     event.preventDefault()
 

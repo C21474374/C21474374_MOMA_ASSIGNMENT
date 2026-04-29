@@ -89,6 +89,7 @@ type ArtworkSummary = {
   [key: string]: unknown
 }
 
+// Format detail values for cards and modal information rows.
 function asDisplayValue(value: unknown) {
   if (value === null || value === undefined || value === '') {
     return 'N/A'
@@ -102,6 +103,7 @@ function asDisplayValue(value: unknown) {
   return String(value)
 }
 
+// Turn the artwork artist field into a readable label for cards and modals.
 function getArtistLabel(artist: ArtworkSummary['Artist']) {
   if (Array.isArray(artist)) {
     return artist.filter(Boolean).join(', ')
@@ -114,6 +116,7 @@ function getArtistLabel(artist: ArtworkSummary['Artist']) {
   return 'Unknown artist'
 }
 
+// Build the short artist card meta line shown on the homepage carousel.
 function getArtistMeta(artist: Artist) {
   const nationality = artist.Nationality || 'Unknown nationality'
   const start = artist.BeginDate ? String(artist.BeginDate) : ''
@@ -126,6 +129,7 @@ function getArtistMeta(artist: Artist) {
   return `${nationality} - ${start || '?'}${end ? `-${end}` : ''}`
 }
 
+// Check whether an artwork item references the same artist by constituent id.
 function hasMatchingConstituent(
   artworkConstituent: number[] | number | undefined,
   artistConstituent: number
@@ -141,6 +145,7 @@ function hasMatchingConstituent(
   return false
 }
 
+// Check whether an artwork item references the same artist by display name.
 function hasMatchingArtistName(
   artworkArtist: string[] | string | undefined,
   artistName: string
@@ -162,6 +167,7 @@ function hasMatchingArtistName(
   return false
 }
 
+// Render a label/value row inside homepage detail modals.
 function InfoRow({
   label,
   value,
@@ -177,6 +183,7 @@ function InfoRow({
   )
 }
 
+// Scroll a horizontal highlight track by roughly one viewport at a time.
 function scrollTrack(
   trackRef: RefObject<HTMLDivElement | null>,
   direction: 'next' | 'prev'
@@ -192,6 +199,7 @@ function scrollTrack(
   })
 }
 
+// Render the homepage hero, highlight carousels, about teaser, and shared detail flows.
 function HomePage() {
   const [artwork, setArtwork] = useState<ArtworkSummary[]>([])
   const [artists, setArtists] = useState<Artist[]>([])
@@ -218,6 +226,7 @@ function HomePage() {
   useEffect(() => {
     let isMounted = true
 
+    // Load the homepage highlight datasets in parallel when the page mounts.
     const loadHighlights = async () => {
       try {
         setLoading(true)
@@ -263,6 +272,7 @@ function HomePage() {
     }
   }, [])
 
+  // Keep homepage artwork cards, related artwork, and open artwork modals in sync.
   const updateArtworkState = (artworkId: string, changes: Partial<ArtworkSummary>) => {
     setArtwork((prev) =>
       prev.map((item) => (item._id === artworkId ? { ...item, ...changes } : item))
@@ -278,6 +288,7 @@ function HomePage() {
     )
   }
 
+  // Keep homepage artist cards and the active artist modal in sync.
   const updateArtistState = (artistId: string, changes: Partial<Artist>) => {
     setArtists((prev) =>
       prev.map((item) => (item._id === artistId ? { ...item, ...changes } : item))
@@ -287,11 +298,13 @@ function HomePage() {
     )
   }
 
+  // Close the artwork detail modal shown from the homepage.
   const closeArtworkDetails = () => {
     setSelectedArtwork(null)
     setArtworkDetailsLoading(false)
   }
 
+  // Close the artist detail flow and clear nested related-artwork state.
   const closeArtistDetails = () => {
     setSelectedArtist(null)
     setSelectedRelatedArtwork(null)
@@ -302,6 +315,7 @@ function HomePage() {
     setRelatedCarouselPage(0)
   }
 
+  // Load the full artwork record for a homepage artwork highlight.
   const openArtworkDetails = async (item: ArtworkSummary) => {
     closeArtistDetails()
     setSelectedArtwork(item)
@@ -323,6 +337,7 @@ function HomePage() {
     }
   }
 
+  // Load the full artist record plus related artwork for a homepage artist highlight.
   const openArtistDetails = async (artist: Artist) => {
     closeArtworkDetails()
     setSelectedArtist(artist)
@@ -379,6 +394,7 @@ function HomePage() {
     }
   }
 
+  // Load a full artwork record from the related-artwork carousel inside the artist modal.
   const openRelatedArtworkDetails = async (item: ArtworkSummary) => {
     setSelectedRelatedArtwork(item)
     setRelatedDetailsLoading(true)
@@ -399,11 +415,13 @@ function HomePage() {
     }
   }
 
+  // Return from a nested related-artwork detail view back to the parent artist modal.
   const goBackToArtistDetails = () => {
     setSelectedRelatedArtwork(null)
     setRelatedDetailsLoading(false)
   }
 
+  // Optimistically toggle likes for artwork shown on homepage cards and artwork modals.
   const handleArtworkLike = async (
     event: MouseEvent<HTMLButtonElement>,
     item: ArtworkSummary
@@ -453,6 +471,7 @@ function HomePage() {
     }
   }
 
+  // Optimistically toggle likes for artist cards and artist modals.
   const handleArtistLike = async (
     event: MouseEvent<HTMLButtonElement>,
     artist: Artist
@@ -502,6 +521,7 @@ function HomePage() {
     }
   }
 
+  // Optimistically toggle likes for artwork shown inside the artist modal carousel.
   const handleRelatedArtworkLike = async (
     event: MouseEvent<HTMLButtonElement>,
     item: ArtworkSummary
@@ -551,6 +571,7 @@ function HomePage() {
     }
   }
 
+  // Keep the related-artwork carousel paging in sync with the current results.
   const relatedCarouselMaxPage = useMemo(() => {
     if (relatedArtwork.length === 0) {
       return 0
@@ -559,6 +580,7 @@ function HomePage() {
     return Math.ceil(relatedArtwork.length / CAROUSEL_PAGE_SIZE) - 1
   }, [relatedArtwork.length])
 
+  // Slice the current page of related artwork for the artist modal carousel.
   const relatedCarouselItems = useMemo(() => {
     const start = relatedCarouselPage * CAROUSEL_PAGE_SIZE
     return relatedArtwork.slice(start, start + CAROUSEL_PAGE_SIZE)

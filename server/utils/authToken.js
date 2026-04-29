@@ -9,6 +9,7 @@ if (!process.env.JWT_SECRET) {
   );
 }
 
+// Sign the JWT payload used by the frontend to restore authenticated sessions.
 function signAuthToken(user) {
   return jwt.sign(
     {
@@ -20,6 +21,7 @@ function signAuthToken(user) {
   );
 }
 
+// Verify and decode a JWT presented by the client.
 function verifyAuthToken(token) {
   return jwt.verify(token, JWT_SECRET);
 }
