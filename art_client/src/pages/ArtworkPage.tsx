@@ -269,7 +269,7 @@ function ArtworkPage() {
   const [visibleCount, setVisibleCount] = useState(PAGE_SIZE)
   const [searchTerm, setSearchTerm] = useState('')
   const [departmentFilter, setDepartmentFilter] = useState('')
-  const [viewFilter, setViewFilter] = useState('')
+  const [dateFilter, setDateFilter] = useState('')
   const [likedArtworkIds, setLikedArtworkIds] = useState<Set<string>>(new Set())
   const [selectedArtwork, setSelectedArtwork] = useState<Artwork | null>(null)
   const [detailsLoading, setDetailsLoading] = useState(false)
@@ -326,7 +326,7 @@ function ArtworkPage() {
 
   useEffect(() => {
     setVisibleCount(PAGE_SIZE)
-  }, [departmentFilter, searchTerm, viewFilter])
+  }, [dateFilter, departmentFilter, searchTerm])
 
   // Build the department filter options from the current dataset.
   const departmentOptions = useMemo(() => {
@@ -339,12 +339,12 @@ function ArtworkPage() {
     ).sort((a, b) => a.localeCompare(b))
   }, [artwork])
 
-  // Build the on-view filter options from the current dataset.
-  const viewOptions = useMemo(() => {
+  // Build the date filter options from the current dataset.
+  const dateOptions = useMemo(() => {
     return Array.from(
       new Set(
         artwork
-          .map((item) => String(item.OnView ?? '').trim())
+          .map((item) => String(item.Date ?? '').trim())
           .filter(Boolean)
       )
     ).sort((a, b) => a.localeCompare(b))
@@ -366,12 +366,12 @@ function ArtworkPage() {
         departmentFilter.length === 0 ||
         String(item.Department ?? '').trim() === departmentFilter
 
-      const matchesView =
-        viewFilter.length === 0 || String(item.OnView ?? '').trim() === viewFilter
+      const matchesDate =
+        dateFilter.length === 0 || String(item.Date ?? '').trim() === dateFilter
 
-      return matchesSearch && matchesDepartment && matchesView
+      return matchesSearch && matchesDepartment && matchesDate
     })
-  }, [artwork, departmentFilter, searchTerm, viewFilter])
+  }, [artwork, dateFilter, departmentFilter, searchTerm])
 
   const visibleArtwork = filteredArtwork.slice(0, visibleCount)
   const canShowMore = visibleCount < filteredArtwork.length
@@ -628,12 +628,12 @@ function ArtworkPage() {
           </select>
           <select
             className="collection-filter-select"
-            aria-label="Filter artwork by view status"
-            value={viewFilter}
-            onChange={(event) => setViewFilter(event.target.value)}
+            aria-label="Filter artwork by date"
+            value={dateFilter}
+            onChange={(event) => setDateFilter(event.target.value)}
           >
-            <option value="">All View Status</option>
-            {viewOptions.map((option) => (
+            <option value="">All Dates</option>
+            {dateOptions.map((option) => (
               <option key={option} value={option}>
                 {option}
               </option>
