@@ -1,34 +1,16 @@
 import { useEffect, useMemo, useState } from 'react'
 import type { MouseEvent } from 'react'
+import {
+  ARTWORK_DETAIL_HIDDEN_FIELDS,
+  ArtworkDetailsContent,
+  getArtistLabel,
+} from '../components/CollectionDetailContent'
 import CrudFormModal, { type CrudFormField } from '../components/CrudFormModal'
 import DetailsModal from '../components/DetailsModal'
 import type { AuthUser } from '../types/auth'
-import { setCurrentUserArtworkLike } from '../utils/auth'
+import { redirectToLoginWithNotice, setCurrentUserArtworkLike } from '../utils/auth'
 
 const PAGE_SIZE = 50
-
-const ARTWORK_HIDDEN_FIELDS = new Set([
-  '_id',
-  'Title',
-  'Artist',
-  'Date',
-  'Medium',
-  'Classification',
-  'Department',
-  'Dimensions',
-  'Height (cm)',
-  'Width (cm)',
-  'Depth (cm)',
-  'CreditLine',
-  'AccessionNumber',
-  'DateAcquired',
-  'Cataloged',
-  'ObjectID',
-  'URL',
-  'ImageURL',
-  'OnView',
-  'Likes',
-])
 
 type Artwork = {
   _id: string
@@ -214,31 +196,6 @@ function buildArtworkPayload(values: ArtworkFormValues, isCreate: boolean) {
   return payload
 }
 
-// Format detail values for artwork modals and fallback rows.
-function asDisplayValue(value: unknown) {
-  if (value === null || value === undefined || value === '') {
-    return 'N/A'
-  }
-  if (Array.isArray(value)) {
-    if (value.length === 0) {
-      return 'N/A'
-    }
-    return value.join(', ')
-  }
-  return String(value)
-}
-
-// Turn the artwork artist field into a readable label for cards and modals.
-function getArtistLabel(artist: Artwork['Artist']) {
-  if (Array.isArray(artist)) {
-    return artist.filter(Boolean).join(', ')
-  }
-  if (typeof artist === 'string') {
-    return artist
-  }
-  return 'Unknown artist'
-}
-
 // Normalize free-text values before applying browser-side search filters.
 function normalizeSearchValue(value: unknown) {
   if (Array.isArray(value)) {
@@ -247,22 +204,6 @@ function normalizeSearchValue(value: unknown) {
   return String(value ?? '')
     .trim()
     .toLowerCase()
-}
-
-// Render a label/value row inside artwork detail modals.
-function ArtworkInfoRow({
-  label,
-  value,
-}: {
-  label: string
-  value: unknown
-}) {
-  return (
-    <div className="modal-info-row">
-      <span className="modal-info-label">{label}</span>
-      <span className="modal-info-value">{asDisplayValue(value)}</span>
-    </div>
-  )
 }
 
 type ArtworkPageProps = {
@@ -393,10 +334,10 @@ function ArtworkPage({ authToken, authUser, onAuthUserUpdate }: ArtworkPageProps
   const visibleArtwork = filteredArtwork.slice(0, visibleCount)
   const canShowMore = visibleCount < filteredArtwork.length
 
-  // Redirect logged-out visitors to the login page before any like mutation can run.
-  const requireSignedInForLike = () => {
+  // Redirect logged-out visitors to the login page before any protected action can run.
+  const requireSignedIn = (message: string) => {
     if (!authToken || !authUser) {
-      window.location.hash = '/login'
+      redirectToLoginWithNotice(message)
       return false
     }
 
@@ -419,6 +360,10 @@ function ArtworkPage({ authToken, authUser, onAuthUserUpdate }: ArtworkPageProps
 
   // Open the artwork modal in create mode with empty defaults.
   const openCreateArtworkEditor = () => {
+    if (!requireSignedIn('Please sign in to manage artwork.')) {
+      return
+    }
+
     setArtworkEditorMode('create')
     setArtworkEditorValues({ ...EMPTY_ARTWORK_FORM_VALUES })
     setArtworkEditorError('')
@@ -426,6 +371,10 @@ function ArtworkPage({ authToken, authUser, onAuthUserUpdate }: ArtworkPageProps
 
   // Open the artwork modal in edit mode using the selected record.
   const openEditArtworkEditor = (item: Artwork) => {
+    if (!requireSignedIn('Please sign in to manage artwork.')) {
+      return
+    }
+
     setArtworkEditorMode('edit')
     setArtworkEditorValues(getArtworkFormValues(item))
     setArtworkEditorError('')
@@ -433,6 +382,10 @@ function ArtworkPage({ authToken, authUser, onAuthUserUpdate }: ArtworkPageProps
 
   // Send create or update requests for artwork records from the shared editor modal.
   const handleArtworkEditorSubmit = async (values: Record<string, string>) => {
+    if (!requireSignedIn('Please sign in to manage artwork.')) {
+      return
+    }
+
     const isCreate = artworkEditorMode === 'create'
     const targetArtwork = isCreate ? null : selectedArtwork
 
@@ -486,6 +439,10 @@ function ArtworkPage({ authToken, authUser, onAuthUserUpdate }: ArtworkPageProps
 
   // Delete the selected artwork after a browser confirmation step.
   const handleDeleteArtwork = async () => {
+    if (!requireSignedIn('Please sign in to manage artwork.')) {
+      return
+    }
+
     if (!selectedArtwork) {
       return
     }
@@ -541,7 +498,7 @@ function ArtworkPage({ authToken, authUser, onAuthUserUpdate }: ArtworkPageProps
   // Optimistically toggle likes for artwork and persist the new count through the API.
   const handleLike = async (event: MouseEvent<HTMLButtonElement>, item: Artwork) => {
     event.stopPropagation()
-    if (!requireSignedInForLike()) {
+    if (!requireSignedIn('Please sign in to like items.')) {
       return
     }
 
@@ -641,7 +598,7 @@ function ArtworkPage({ authToken, authUser, onAuthUserUpdate }: ArtworkPageProps
     selectedArtwork === null
       ? []
       : Object.entries(selectedArtwork).filter(([key, value]) => {
-          if (ARTWORK_HIDDEN_FIELDS.has(key)) {
+          if (ARTWORK_DETAIL_HIDDEN_FIELDS.has(key)) {
             return false
           }
 
@@ -700,6 +657,7 @@ function ArtworkPage({ authToken, authUser, onAuthUserUpdate }: ArtworkPageProps
               type="button"
               className="collection-action-btn"
               onClick={openCreateArtworkEditor}
+              title={authUser ? 'Add artwork' : 'Sign in to add artwork'}
             >
               Add Artwork
             </button>
@@ -770,172 +728,46 @@ function ArtworkPage({ authToken, authUser, onAuthUserUpdate }: ArtworkPageProps
         onClose={closeDetails}
       >
         {selectedArtwork && (
-          <div className="modal-content artwork-modal-layout">
-            <div className="detail-toolbar">
-              <button
-                type="button"
-                className="detail-action-btn"
-                onClick={() => openEditArtworkEditor(selectedArtwork)}
-              >
-                Edit Artwork
-              </button>
-              <button
-                type="button"
-                className="detail-action-btn detail-action-btn-danger"
-                onClick={handleDeleteArtwork}
-              >
-                Delete Artwork
-              </button>
-            </div>
-            <div className="artwork-main-grid">
-              <section className="modal-section modal-section-with-like">
-                <h3 className="modal-section-title">Artwork Information</h3>
-                <div className="modal-info-grid">
-                  <ArtworkInfoRow label="Title" value={selectedArtwork.Title} />
-                  <ArtworkInfoRow
-                    label="Artist"
-                    value={getArtistLabel(selectedArtwork.Artist)}
-                  />
-                  <ArtworkInfoRow label="Date" value={selectedArtwork.Date} />
-                  <ArtworkInfoRow label="Medium" value={selectedArtwork.Medium} />
-                  <ArtworkInfoRow
-                    label="Classification"
-                    value={selectedArtwork.Classification}
-                  />
-                  <ArtworkInfoRow
-                    label="Department"
-                    value={selectedArtwork.Department}
-                  />
-                  <ArtworkInfoRow
-                    label="Accession Number"
-                    value={selectedArtwork.AccessionNumber}
-                  />
-                  <ArtworkInfoRow label="Object ID" value={selectedArtwork.ObjectID} />
-                  <ArtworkInfoRow label="Likes" value={selectedArtwork.Likes ?? 0} />
-                </div>
+          <ArtworkDetailsContent
+            artwork={selectedArtwork}
+            extraFields={extraArtworkFields}
+            isLiked={isSelectedArtworkLiked}
+            onToggleLike={handleLike}
+            likeAriaLabel={
+              authUser
+                ? `${isSelectedArtworkLiked ? 'Unlike' : 'Like'} ${
+                    selectedArtwork.Title || 'artwork'
+                  }`
+                : `Sign in to like ${selectedArtwork.Title || 'artwork'}`
+            }
+            likeTitle={
+              authUser
+                ? isSelectedArtworkLiked
+                  ? 'Unlike'
+                  : 'Like'
+                : 'Sign in to like'
+            }
+            toolbar={
+              <div className="detail-toolbar">
                 <button
                   type="button"
-                  className={`modal-section-like-btn ${
-                    isSelectedArtworkLiked ? 'liked' : ''
-                  }`}
-                  onClick={(event) => handleLike(event, selectedArtwork)}
-                  aria-label={
-                    authUser
-                      ? `${
-                          isSelectedArtworkLiked ? 'Unlike' : 'Like'
-                        } ${selectedArtwork.Title || 'artwork'}`
-                      : `Sign in to like ${selectedArtwork.Title || 'artwork'}`
-                  }
-                  title={
-                    authUser
-                      ? isSelectedArtworkLiked
-                        ? 'Unlike'
-                        : 'Like'
-                      : 'Sign in to like'
-                  }
+                  className="detail-action-btn"
+                  onClick={() => openEditArtworkEditor(selectedArtwork)}
+                  title={authUser ? 'Edit artwork' : 'Sign in to edit artwork'}
                 >
-                  {isSelectedArtworkLiked ? '\u2665' : '\u2661'}
+                  Edit Artwork
                 </button>
-              </section>
-
-              <section className="modal-section artwork-image-section">
-                <h3 className="modal-section-title">Artwork Image</h3>
-                {selectedArtwork.ImageURL ? (
-                  <img
-                    src={selectedArtwork.ImageURL}
-                    alt={selectedArtwork.Title || 'Artwork image'}
-                    className="modal-artwork-image"
-                  />
-                ) : (
-                  <div className="modal-artwork-image-empty">No image available</div>
-                )}
-              </section>
-            </div>
-
-            <section className="modal-section">
-              <h3 className="modal-section-title">Dimensions & Gallery Status</h3>
-              <div className="modal-info-grid">
-                <ArtworkInfoRow label="Dimensions" value={selectedArtwork.Dimensions} />
-                <ArtworkInfoRow
-                  label="Height (cm)"
-                  value={selectedArtwork['Height (cm)']}
-                />
-                <ArtworkInfoRow
-                  label="Width (cm)"
-                  value={selectedArtwork['Width (cm)']}
-                />
-                <ArtworkInfoRow
-                  label="Depth (cm)"
-                  value={selectedArtwork['Depth (cm)']}
-                />
-                <ArtworkInfoRow label="On View" value={selectedArtwork.OnView} />
-                <ArtworkInfoRow
-                  label="Date Acquired"
-                  value={selectedArtwork.DateAcquired}
-                />
-                <ArtworkInfoRow label="Cataloged" value={selectedArtwork.Cataloged} />
+                <button
+                  type="button"
+                  className="detail-action-btn detail-action-btn-danger"
+                  onClick={handleDeleteArtwork}
+                  title={authUser ? 'Delete artwork' : 'Sign in to delete artwork'}
+                >
+                  Delete Artwork
+                </button>
               </div>
-              <p className="modal-bio">
-                <span className="modal-info-label">Credit Line:</span>{' '}
-                {asDisplayValue(selectedArtwork.CreditLine)}
-              </p>
-            </section>
-
-            <section className="modal-section">
-              <h3 className="modal-section-title">Links</h3>
-              <div className="modal-info-grid">
-                <div className="modal-info-row">
-                  <span className="modal-info-label">Artwork URL</span>
-                  <span className="modal-info-value">
-                    {typeof selectedArtwork.URL === 'string' && selectedArtwork.URL ? (
-                      <a
-                        href={selectedArtwork.URL}
-                        target="_blank"
-                        rel="noreferrer"
-                        className="modal-link"
-                      >
-                        Open artwork link
-                      </a>
-                    ) : (
-                      'N/A'
-                    )}
-                  </span>
-                </div>
-                <div className="modal-info-row">
-                  <span className="modal-info-label">Image URL</span>
-                  <span className="modal-info-value">
-                    {typeof selectedArtwork.ImageURL === 'string' &&
-                    selectedArtwork.ImageURL ? (
-                      <a
-                        href={selectedArtwork.ImageURL}
-                        target="_blank"
-                        rel="noreferrer"
-                        className="modal-link"
-                      >
-                        Open image link
-                      </a>
-                    ) : (
-                      'N/A'
-                    )}
-                  </span>
-                </div>
-              </div>
-            </section>
-
-            {extraArtworkFields.length > 0 && (
-              <section className="modal-section">
-                <h3 className="modal-section-title">Additional Details</h3>
-                <div className="details-list">
-                  {extraArtworkFields.map(([key, value]) => (
-                    <div className="details-row" key={key}>
-                      <div className="details-key">{key}</div>
-                      <div className="details-value">{asDisplayValue(value)}</div>
-                    </div>
-                  ))}
-                </div>
-              </section>
-            )}
-          </div>
+            }
+          />
         )}
       </DetailsModal>
       <CrudFormModal

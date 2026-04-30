@@ -1,16 +1,42 @@
-import { useEffect, useRef, useState } from 'react'
-import type { FormEvent, RefObject } from 'react'
+import { useEffect, useMemo, useState } from 'react'
+import type { FormEvent } from 'react'
+import {
+  ArtistCarouselCard,
+  ArtworkCarouselCard,
+  CollectionCarouselSection,
+  getArtistCarouselMeta,
+} from '../components/CollectionCarousel'
+import {
+  ARTIST_DETAIL_HIDDEN_FIELDS,
+  ARTWORK_DETAIL_HIDDEN_FIELDS,
+  ArtistDetailsContent,
+  ArtworkDetailsContent,
+} from '../components/CollectionDetailContent'
+import DetailsModal from '../components/DetailsModal'
 import type { AuthResponse, AuthUser } from '../types/auth'
-import { deleteCurrentUser, updateCurrentUser } from '../utils/auth'
+import {
+  deleteCurrentUser,
+  setCurrentUserArtistLike,
+  setCurrentUserArtworkLike,
+  updateCurrentUser,
+} from '../utils/auth'
+
+const RELATED_ARTWORK_LIMIT = 200
+const CAROUSEL_PAGE_SIZE = 3
 
 type LikedArtist = {
   _id: string
   DisplayName?: string
   ArtistBio?: string
   Nationality?: string
+  Gender?: string
   BeginDate?: number
   EndDate?: number
+  ConstituentID?: number
+  ULAN?: string
+  ['Wiki QID']?: string
   Likes?: number
+  [key: string]: unknown
 }
 
 type LikedArtwork = {
@@ -20,13 +46,29 @@ type LikedArtwork = {
   Date?: string
   ImageURL?: string
   Medium?: string
+  Classification?: string
+  Department?: string
+  Dimensions?: string
+  ['Height (cm)']?: number
+  ['Width (cm)']?: number
+  ['Depth (cm)']?: number
+  CreditLine?: string
+  AccessionNumber?: string
+  DateAcquired?: string
+  Cataloged?: string
+  ConstituentID?: number[] | number
+  ObjectID?: number
+  URL?: string
+  OnView?: string
   Likes?: number
+  [key: string]: unknown
 }
 
 type AccountSettingsPageProps = {
   authToken: string | null
   user: AuthUser | null
   onAuthSuccess: (response: AuthResponse) => void
+  onAuthUserUpdate: (user: AuthUser) => void
   onAccountDeleted: () => void
 }
 
@@ -44,48 +86,43 @@ function formatDate(value: string | undefined) {
   return parsedDate.toLocaleString()
 }
 
-// Turn the artwork artist field into a readable label for account liked-artwork cards.
-function getArtistLabel(artist: LikedArtwork['Artist']) {
-  if (Array.isArray(artist)) {
-    return artist.filter(Boolean).join(', ')
-  }
-
-  if (typeof artist === 'string') {
-    return artist
-  }
-
-  return 'Unknown artist'
-}
-
-// Build the short artist card meta line shown on the account liked-artists carousel.
-function getArtistMeta(artist: LikedArtist) {
-  const nationality = artist.Nationality || 'Unknown nationality'
-  const start = artist.BeginDate ? String(artist.BeginDate) : ''
-  const end = artist.EndDate ? String(artist.EndDate) : ''
-
-  if (!start && !end) {
-    return nationality
-  }
-
-  return `${nationality} - ${start || '?'}${end ? `-${end}` : ''}`
-}
-
-// Scroll a horizontal liked-items track by roughly one viewport at a time.
-function scrollTrack(
-  trackRef: RefObject<HTMLDivElement | null>,
-  direction: 'next' | 'prev',
+// Check whether an artwork item references the same artist by constituent id.
+function hasMatchingConstituent(
+  artworkConstituent: number[] | number | undefined,
+  artistConstituent: number,
 ) {
-  if (!trackRef.current) {
-    return
+  if (Array.isArray(artworkConstituent)) {
+    return artworkConstituent.some((value) => Number(value) === artistConstituent)
   }
 
-  const offset = trackRef.current.clientWidth * 0.85
-  trackRef.current.scrollBy({
-    left: direction === 'next' ? offset : -offset,
-    behavior: 'smooth',
-  })
+  if (typeof artworkConstituent === 'number') {
+    return Number(artworkConstituent) === artistConstituent
+  }
+
+  return false
 }
 
+// Check whether an artwork item references the same artist by display name.
+function hasMatchingArtistName(
+  artworkArtist: string[] | string | undefined,
+  artistName: string,
+) {
+  if (!artistName) {
+    return false
+  }
+
+  if (Array.isArray(artworkArtist)) {
+    return artworkArtist.some(
+      (name) => String(name).trim().toLowerCase() === artistName,
+    )
+  }
+
+  if (typeof artworkArtist === 'string') {
+    return artworkArtist.trim().toLowerCase() === artistName
+  }
+
+  return false
+}
 // Load liked artist or artwork records one-by-one from the public collection endpoints.
 async function fetchLikedRecords<T>(endpoint: 'artists' | 'artwork', ids: string[]) {
   const responses = await Promise.allSettled(
@@ -109,6 +146,7 @@ function AccountSettingsPage({
   authToken,
   user,
   onAuthSuccess,
+  onAuthUserUpdate,
   onAccountDeleted,
 }: AccountSettingsPageProps) {
   const [isEditing, setIsEditing] = useState(false)
@@ -124,8 +162,23 @@ function AccountSettingsPage({
   const [likedArtwork, setLikedArtwork] = useState<LikedArtwork[]>([])
   const [likedLoading, setLikedLoading] = useState(false)
   const [likedError, setLikedError] = useState('')
-  const artworkTrackRef = useRef<HTMLDivElement | null>(null)
-  const artistTrackRef = useRef<HTMLDivElement | null>(null)
+  const [likedActionError, setLikedActionError] = useState('')
+  const [selectedArtwork, setSelectedArtwork] = useState<LikedArtwork | null>(null)
+  const [selectedArtist, setSelectedArtist] = useState<LikedArtist | null>(null)
+  const [selectedRelatedArtwork, setSelectedRelatedArtwork] =
+    useState<LikedArtwork | null>(null)
+  const [artworkDetailsLoading, setArtworkDetailsLoading] = useState(false)
+  const [artistDetailsLoading, setArtistDetailsLoading] = useState(false)
+  const [relatedArtwork, setRelatedArtwork] = useState<LikedArtwork[]>([])
+  const [relatedLoading, setRelatedLoading] = useState(false)
+  const [relatedDetailsLoading, setRelatedDetailsLoading] = useState(false)
+  const [relatedCarouselPage, setRelatedCarouselPage] = useState(0)
+  const [pendingLikedArtistIds, setPendingLikedArtistIds] = useState<Set<string>>(
+    new Set(),
+  )
+  const [pendingLikedArtworkIds, setPendingLikedArtworkIds] = useState<Set<string>>(
+    new Set(),
+  )
 
   useEffect(() => {
     if (!user) {
@@ -136,6 +189,12 @@ function AccountSettingsPage({
       setIsEditing(false)
       setFormError('')
       setFormSuccess('')
+      setLikedActionError('')
+      setSelectedArtwork(null)
+      setSelectedArtist(null)
+      setSelectedRelatedArtwork(null)
+      setRelatedArtwork([])
+      setRelatedCarouselPage(0)
       return
     }
 
@@ -155,6 +214,7 @@ function AccountSettingsPage({
         setLikedArtists([])
         setLikedArtwork([])
         setLikedError('')
+        setLikedActionError('')
         return
       }
 
@@ -162,6 +222,7 @@ function AccountSettingsPage({
         setLikedArtists([])
         setLikedArtwork([])
         setLikedError('')
+        setLikedActionError('')
         return
       }
 
@@ -198,6 +259,259 @@ function AccountSettingsPage({
       isMounted = false
     }
   }, [user])
+
+  // Close the artwork detail modal opened from the liked artwork carousel.
+  const closeArtworkDetails = () => {
+    setSelectedArtwork(null)
+    setArtworkDetailsLoading(false)
+  }
+
+  // Close the artist detail flow and clear nested related-artwork state.
+  const closeArtistDetails = () => {
+    setSelectedArtist(null)
+    setSelectedRelatedArtwork(null)
+    setArtistDetailsLoading(false)
+    setRelatedLoading(false)
+    setRelatedDetailsLoading(false)
+    setRelatedArtwork([])
+    setRelatedCarouselPage(0)
+  }
+
+  // Load the full artwork record for a liked artwork card.
+  const openArtworkDetails = async (item: LikedArtwork) => {
+    closeArtistDetails()
+    setSelectedArtwork(item)
+    setArtworkDetailsLoading(true)
+
+    try {
+      const response = await fetch(`/api/artwork/${item._id}`)
+      if (!response.ok) {
+        throw new Error(`Request failed with status ${response.status}`)
+      }
+
+      const detailedArtwork = (await response.json()) as LikedArtwork
+      setSelectedArtwork(detailedArtwork)
+    } catch {
+      setSelectedArtwork(item)
+    } finally {
+      setArtworkDetailsLoading(false)
+    }
+  }
+
+  // Load the full artist record plus related artwork for a liked artist card.
+  const openArtistDetails = async (artist: LikedArtist) => {
+    closeArtworkDetails()
+    setSelectedArtist(artist)
+    setSelectedRelatedArtwork(null)
+    setArtistDetailsLoading(true)
+    setRelatedLoading(true)
+    setRelatedDetailsLoading(false)
+    setRelatedArtwork([])
+    setRelatedCarouselPage(0)
+
+    let detailedArtist: LikedArtist = artist
+
+    try {
+      const response = await fetch(`/api/artists/${artist._id}`)
+      if (!response.ok) {
+        throw new Error(`Request failed with status ${response.status}`)
+      }
+
+      detailedArtist = (await response.json()) as LikedArtist
+      setSelectedArtist(detailedArtist)
+    } catch {
+      setSelectedArtist(artist)
+    } finally {
+      setArtistDetailsLoading(false)
+    }
+
+    try {
+      const response = await fetch(`/api/artwork?limit=${RELATED_ARTWORK_LIMIT}`)
+      if (!response.ok) {
+        throw new Error(`Request failed with status ${response.status}`)
+      }
+
+      const artworkData = (await response.json()) as LikedArtwork[]
+      const artistName = String(detailedArtist.DisplayName || '').trim().toLowerCase()
+      const constituentId = Number(detailedArtist.ConstituentID)
+      const hasConstituent = Number.isFinite(constituentId)
+
+      const matchingArtwork = artworkData
+        .filter((item) => {
+          const byConstituent =
+            hasConstituent &&
+            hasMatchingConstituent(item.ConstituentID, constituentId)
+          const byName = hasMatchingArtistName(item.Artist, artistName)
+          return byConstituent || byName
+        })
+        .sort((a, b) => Number(b.Likes ?? 0) - Number(a.Likes ?? 0))
+
+      setRelatedArtwork(matchingArtwork)
+    } catch {
+      setRelatedArtwork([])
+    } finally {
+      setRelatedLoading(false)
+    }
+  }
+
+  // Load a full artwork record from the artist modal carousel.
+  const openRelatedArtworkDetails = async (item: LikedArtwork) => {
+    setSelectedRelatedArtwork(item)
+    setRelatedDetailsLoading(true)
+
+    try {
+      const response = await fetch(`/api/artwork/${item._id}`)
+      if (!response.ok) {
+        throw new Error(`Request failed with status ${response.status}`)
+      }
+
+      const detailedArtwork = (await response.json()) as LikedArtwork
+      setSelectedRelatedArtwork(detailedArtwork)
+      setRelatedArtwork((prev) =>
+        prev.map((artworkItem) =>
+          artworkItem._id === item._id ? detailedArtwork : artworkItem,
+        ),
+      )
+    } catch {
+      setSelectedRelatedArtwork(item)
+    } finally {
+      setRelatedDetailsLoading(false)
+    }
+  }
+
+  // Return from nested related artwork details back to the parent artist modal.
+  const goBackToArtistDetails = () => {
+    setSelectedRelatedArtwork(null)
+    setRelatedDetailsLoading(false)
+  }
+
+  // Remove a liked artwork from the signed-in account and keep the shared count in sync.
+  const handleUnlikeArtwork = async (item: LikedArtwork) => {
+    if (!authToken || !user) {
+      setLikedActionError('You must be signed in to update your liked artwork.')
+      return
+    }
+
+    setLikedActionError('')
+    setPendingLikedArtworkIds((prev) => {
+      const next = new Set(prev)
+      next.add(item._id)
+      return next
+    })
+
+    const currentLikes = Math.max(0, Number(item.Likes ?? 0))
+    const nextLikes = Math.max(0, currentLikes - 1)
+    let syncedAccountLike = false
+
+    try {
+      const updatedUser = await setCurrentUserArtworkLike(authToken, item._id, false)
+      onAuthUserUpdate(updatedUser)
+      syncedAccountLike = true
+
+      const response = await fetch(`/api/artwork/${item._id}`, {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ Likes: nextLikes }),
+      })
+
+      if (!response.ok) {
+        throw new Error('Failed to update artwork like count.')
+      }
+
+      setLikedArtwork((prev) => prev.filter((artworkItem) => artworkItem._id !== item._id))
+      setSelectedArtwork((prev) => (prev && prev._id === item._id ? null : prev))
+      setSelectedRelatedArtwork((prev) =>
+        prev && prev._id === item._id ? null : prev,
+      )
+      setRelatedArtwork((prev) =>
+        prev.map((artworkItem) =>
+          artworkItem._id === item._id
+            ? { ...artworkItem, Likes: nextLikes }
+            : artworkItem,
+        ),
+      )
+    } catch (requestError) {
+      if (syncedAccountLike) {
+        try {
+          const revertedUser = await setCurrentUserArtworkLike(authToken, item._id, true)
+          onAuthUserUpdate(revertedUser)
+        } catch {
+          // The UI falls back to the refreshed account state if the rollback also fails.
+        }
+      }
+
+      setLikedActionError(
+        requestError instanceof Error
+          ? requestError.message
+          : 'Unable to remove this artwork from your liked items right now.',
+      )
+    } finally {
+      setPendingLikedArtworkIds((prev) => {
+        const next = new Set(prev)
+        next.delete(item._id)
+        return next
+      })
+    }
+  }
+
+  // Remove a liked artist from the signed-in account and keep the shared count in sync.
+  const handleUnlikeArtist = async (artist: LikedArtist) => {
+    if (!authToken || !user) {
+      setLikedActionError('You must be signed in to update your liked artists.')
+      return
+    }
+
+    setLikedActionError('')
+    setPendingLikedArtistIds((prev) => {
+      const next = new Set(prev)
+      next.add(artist._id)
+      return next
+    })
+
+    const currentLikes = Math.max(0, Number(artist.Likes ?? 0))
+    const nextLikes = Math.max(0, currentLikes - 1)
+    let syncedAccountLike = false
+
+    try {
+      const updatedUser = await setCurrentUserArtistLike(authToken, artist._id, false)
+      onAuthUserUpdate(updatedUser)
+      syncedAccountLike = true
+
+      const response = await fetch(`/api/artists/${artist._id}`, {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ Likes: nextLikes }),
+      })
+
+      if (!response.ok) {
+        throw new Error('Failed to update artist like count.')
+      }
+
+      setLikedArtists((prev) => prev.filter((likedArtist) => likedArtist._id !== artist._id))
+      setSelectedArtist((prev) => (prev && prev._id === artist._id ? null : prev))
+    } catch (requestError) {
+      if (syncedAccountLike) {
+        try {
+          const revertedUser = await setCurrentUserArtistLike(authToken, artist._id, true)
+          onAuthUserUpdate(revertedUser)
+        } catch {
+          // The UI falls back to the refreshed account state if the rollback also fails.
+        }
+      }
+
+      setLikedActionError(
+        requestError instanceof Error
+          ? requestError.message
+          : 'Unable to remove this artist from your liked items right now.',
+      )
+    } finally {
+      setPendingLikedArtistIds((prev) => {
+        const next = new Set(prev)
+        next.delete(artist._id)
+        return next
+      })
+    }
+  }
 
   // Submit profile changes for the signed-in user and refresh the top-level auth state.
   const handleSubmit = async (event: FormEvent<HTMLFormElement>) => {
@@ -303,6 +617,49 @@ function AccountSettingsPage({
     setFormSuccess('')
     setIsEditing(false)
   }
+
+  // Keep the related-artwork carousel paging in sync with the current artist results.
+  const relatedCarouselMaxPage = Math.max(
+    0,
+    Math.ceil(relatedArtwork.length / CAROUSEL_PAGE_SIZE) - 1,
+  )
+  const relatedCarouselItems = useMemo(() => {
+    const start = relatedCarouselPage * CAROUSEL_PAGE_SIZE
+    return relatedArtwork.slice(start, start + CAROUSEL_PAGE_SIZE)
+  }, [relatedArtwork, relatedCarouselPage])
+
+  const extraArtistFields =
+    selectedArtist === null
+      ? []
+      : Object.entries(selectedArtist).filter(([key, value]) => {
+          if (ARTIST_DETAIL_HIDDEN_FIELDS.has(key)) {
+            return false
+          }
+
+          return value !== null && value !== undefined && value !== ''
+        })
+
+  const extraArtworkFields =
+    selectedArtwork === null
+      ? []
+      : Object.entries(selectedArtwork).filter(([key, value]) => {
+          if (ARTWORK_DETAIL_HIDDEN_FIELDS.has(key)) {
+            return false
+          }
+
+          return value !== null && value !== undefined && value !== ''
+        })
+
+  const extraRelatedArtworkFields =
+    selectedRelatedArtwork === null
+      ? []
+      : Object.entries(selectedRelatedArtwork).filter(([key, value]) => {
+          if (ARTWORK_DETAIL_HIDDEN_FIELDS.has(key)) {
+            return false
+          }
+
+          return value !== null && value !== undefined && value !== ''
+        })
 
   if (!user) {
     return (
@@ -469,126 +826,150 @@ function AccountSettingsPage({
             These carousels are populated from the likes saved directly to your
             account profile.
           </p>
+          {likedActionError ? <p className="auth-error">{likedActionError}</p> : null}
         </section>
       </div>
 
-      <section className="home-section account-liked-section">
-        <div className="home-section-header">
-          <div>
-            <h2 className="page-title home-section-title">Liked Artwork</h2>
-            <p className="page-subtitle home-section-subtitle">
-              The artwork currently saved to your signed-in profile.
-            </p>
-          </div>
-          <div className="home-section-actions">
-            <div className="home-carousel-controls">
-              <button
-                type="button"
-                className="carousel-btn"
-                onClick={() => scrollTrack(artworkTrackRef, 'prev')}
-              >
-                Prev
-              </button>
-              <button
-                type="button"
-                className="carousel-btn"
-                onClick={() => scrollTrack(artworkTrackRef, 'next')}
-              >
-                Next
-              </button>
-            </div>
-          </div>
-        </div>
+      <CollectionCarouselSection
+        title="Liked Artwork"
+        subtitle="The artwork currently saved to your signed-in profile."
+        hasItems={likedArtwork.length > 0}
+        status={
+          likedLoading ? (
+            <p className="status-text">Loading liked artwork...</p>
+          ) : likedError ? (
+            <p className="status-text">Error: {likedError}</p>
+          ) : likedArtwork.length === 0 ? (
+            <p className="status-text">No liked artwork saved to this account yet.</p>
+          ) : undefined
+        }
+      >
+        {likedArtwork.map((item) => {
+          const isPending = pendingLikedArtworkIds.has(item._id)
 
-        {likedLoading ? (
-          <p className="status-text">Loading liked artwork...</p>
-        ) : likedError ? (
-          <p className="status-text">Error: {likedError}</p>
-        ) : likedArtwork.length === 0 ? (
-          <p className="status-text">No liked artwork saved to this account yet.</p>
-        ) : (
-          <div className="home-carousel-track" ref={artworkTrackRef}>
-            {likedArtwork.map((item) => (
-              <article className="card home-carousel-card" key={item._id}>
-                {item.ImageURL ? (
-                  <img
-                    src={item.ImageURL}
-                    alt={item.Title || 'Artwork'}
-                    className="card-image home-carousel-image"
-                    loading="lazy"
-                  />
-                ) : (
-                  <div className="card-image card-image-empty home-carousel-image">
-                    No image
-                  </div>
-                )}
-                <h3 className="card-title">{item.Title || 'Untitled'}</h3>
-                <p className="card-meta">{getArtistLabel(item.Artist)}</p>
-                <p className="card-meta">{item.Date || item.Medium || 'Unknown date'}</p>
-                <p className="card-likes">Likes: {item.Likes ?? 0}</p>
-              </article>
-            ))}
-          </div>
-        )}
-      </section>
-
-      <section className="home-section account-liked-section">
-        <div className="home-section-header">
-          <div>
-            <h2 className="page-title home-section-title">Liked Artists</h2>
-            <p className="page-subtitle home-section-subtitle">
-              The artists currently saved to your signed-in profile.
-            </p>
-          </div>
-          <div className="home-section-actions">
-            <div className="home-carousel-controls">
-              <button
-                type="button"
-                className="carousel-btn"
-                onClick={() => scrollTrack(artistTrackRef, 'prev')}
-              >
-                Prev
-              </button>
-              <button
-                type="button"
-                className="carousel-btn"
-                onClick={() => scrollTrack(artistTrackRef, 'next')}
-              >
-                Next
-              </button>
-            </div>
-          </div>
-        </div>
-
-        {likedLoading ? (
-          <p className="status-text">Loading liked artists...</p>
-        ) : likedError ? null : likedArtists.length === 0 ? (
-          <p className="status-text">No liked artists saved to this account yet.</p>
-        ) : (
-          <div className="home-carousel-track" ref={artistTrackRef}>
-            {likedArtists.map((artist) => {
-              const bioText =
-                typeof artist.ArtistBio === 'string' ? artist.ArtistBio.trim() : ''
-
-              return (
-                <article
-                  className="card home-carousel-card home-artist-card"
-                  key={artist._id}
+          return (
+            <ArtworkCarouselCard
+              key={item._id}
+              artwork={item}
+              metaText={item.Date || item.Medium || 'Unknown date'}
+              onOpen={openArtworkDetails}
+              actionButton={
+                <button
+                  type="button"
+                  className="card-heart-btn liked"
+                  onClick={(event) => {
+                    event.stopPropagation()
+                    handleUnlikeArtwork(item)
+                  }}
+                  aria-label={`Unlike ${item.Title || 'artwork'}`}
+                  title={isPending ? 'Removing from liked artwork' : 'Unlike artwork'}
+                  disabled={isPending}
                 >
-                  <div className="home-artist-card-body">
-                    <h3 className="card-title">{artist.DisplayName || 'Unknown Artist'}</h3>
-                    <p className="card-meta">{getArtistMeta(artist)}</p>
-                    <p className="home-artist-bio">
-                      {bioText || 'No biography available for this artist.'}
-                    </p>
-                  </div>
-                  <p className="card-likes">Likes: {artist.Likes ?? 0}</p>
-                </article>
-              )
-            })}
-          </div>
+                  {'\u2665'}
+                </button>
+              }
+            />
+          )
+        })}
+      </CollectionCarouselSection>
+
+      <CollectionCarouselSection
+        title="Liked Artists"
+        subtitle="The artists currently saved to your signed-in profile."
+        hasItems={likedArtists.length > 0}
+        status={
+          likedLoading ? (
+            <p className="status-text">Loading liked artists...</p>
+          ) : likedError ? (
+            <p className="status-text">Error: {likedError}</p>
+          ) : likedArtists.length === 0 ? (
+            <p className="status-text">No liked artists saved to this account yet.</p>
+          ) : undefined
+        }
+      >
+        {likedArtists.map((artist) => {
+          const bioText =
+            typeof artist.ArtistBio === 'string' ? artist.ArtistBio.trim() : ''
+          const isPending = pendingLikedArtistIds.has(artist._id)
+
+          return (
+            <ArtistCarouselCard
+              key={artist._id}
+              artist={artist}
+              metaText={getArtistCarouselMeta(artist)}
+              bioText={bioText || 'No biography available for this artist.'}
+              onOpen={openArtistDetails}
+              actionButton={
+                <button
+                  type="button"
+                  className="card-heart-btn liked"
+                  onClick={(event) => {
+                    event.stopPropagation()
+                    handleUnlikeArtist(artist)
+                  }}
+                  aria-label={`Unlike ${artist.DisplayName || 'artist'}`}
+                  title={isPending ? 'Removing from liked artists' : 'Unlike artist'}
+                  disabled={isPending}
+                >
+                  {'\u2665'}
+                </button>
+              }
+              titleFallback="Unknown Artist"
+            />
+          )
+        })}
+      </CollectionCarouselSection>
+
+      <DetailsModal
+        title={selectedArtwork?.Title || 'Artwork'}
+        item={selectedArtwork}
+        loading={artworkDetailsLoading}
+        onClose={closeArtworkDetails}
+      >
+        {selectedArtwork && (
+          <ArtworkDetailsContent
+            artwork={selectedArtwork}
+            extraFields={extraArtworkFields}
+          />
         )}
-      </section>
+      </DetailsModal>
+
+      <DetailsModal
+        title={selectedRelatedArtwork?.Title || selectedArtist?.DisplayName || 'Artist'}
+        item={selectedRelatedArtwork || selectedArtist}
+        loading={selectedRelatedArtwork ? relatedDetailsLoading : artistDetailsLoading}
+        onBack={selectedRelatedArtwork ? goBackToArtistDetails : undefined}
+        backLabel="Back to artist"
+        onClose={closeArtistDetails}
+      >
+        {selectedRelatedArtwork ? (
+          <ArtworkDetailsContent
+            artwork={selectedRelatedArtwork}
+            extraFields={extraRelatedArtworkFields}
+          />
+        ) : (
+          selectedArtist && (
+            <ArtistDetailsContent
+              artist={selectedArtist}
+              extraFields={extraArtistFields}
+              relatedArtwork={relatedArtwork}
+              relatedArtworkItems={relatedCarouselItems}
+              relatedLoading={relatedLoading}
+              relatedCarouselPage={relatedCarouselPage}
+              relatedCarouselMaxPage={relatedCarouselMaxPage}
+              onPreviousRelatedPage={() =>
+                setRelatedCarouselPage((prev) => Math.max(0, prev - 1))
+              }
+              onNextRelatedPage={() =>
+                setRelatedCarouselPage((prev) =>
+                  Math.min(relatedCarouselMaxPage, prev + 1),
+                )
+              }
+              onOpenRelatedArtwork={openRelatedArtworkDetails}
+            />
+          )
+        )}
+      </DetailsModal>
     </section>
   )
 }

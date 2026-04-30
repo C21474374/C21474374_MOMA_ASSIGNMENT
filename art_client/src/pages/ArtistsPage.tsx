@@ -1,52 +1,22 @@
 import { useEffect, useMemo, useState } from 'react'
 import type { MouseEvent } from 'react'
+import {
+  ARTIST_DETAIL_HIDDEN_FIELDS,
+  ARTWORK_DETAIL_HIDDEN_FIELDS,
+  ArtistDetailsContent,
+  ArtworkDetailsContent,
+} from '../components/CollectionDetailContent'
 import CrudFormModal, { type CrudFormField } from '../components/CrudFormModal'
 import DetailsModal from '../components/DetailsModal'
 import type { AuthUser } from '../types/auth'
 import {
+  redirectToLoginWithNotice,
   setCurrentUserArtistLike,
   setCurrentUserArtworkLike,
 } from '../utils/auth'
 
 const PAGE_SIZE = 50
 const CAROUSEL_PAGE_SIZE = 3
-
-const ARTIST_HIDDEN_FIELDS = new Set([
-  '_id',
-  'DisplayName',
-  'ArtistBio',
-  'Nationality',
-  'Gender',
-  'BeginDate',
-  'EndDate',
-  'ConstituentID',
-  'ULAN',
-  'Wiki QID',
-  'Likes',
-])
-
-const ARTWORK_HIDDEN_FIELDS = new Set([
-  '_id',
-  'Title',
-  'Artist',
-  'Date',
-  'Medium',
-  'Classification',
-  'Department',
-  'Dimensions',
-  'Height (cm)',
-  'Width (cm)',
-  'Depth (cm)',
-  'CreditLine',
-  'AccessionNumber',
-  'DateAcquired',
-  'Cataloged',
-  'ObjectID',
-  'URL',
-  'ImageURL',
-  'OnView',
-  'Likes',
-])
 
 type Artist = {
   _id: string
@@ -222,52 +192,11 @@ function buildArtistPayload(values: ArtistFormValues, isCreate: boolean) {
   return payload
 }
 
-// Format detail values for modals and fallback rows.
-function asDisplayValue(value: unknown) {
-  if (value === null || value === undefined || value === '') {
-    return 'N/A'
-  }
-  if (Array.isArray(value)) {
-    if (value.length === 0) {
-      return 'N/A'
-    }
-    return value.join(', ')
-  }
-  return String(value)
-}
-
-// Turn the artwork artist field into a readable label for cards and modals.
-function getArtistLabel(artist: ArtworkSummary['Artist']) {
-  if (Array.isArray(artist)) {
-    return artist.filter(Boolean).join(', ')
-  }
-  if (typeof artist === 'string') {
-    return artist
-  }
-  return 'Unknown artist'
-}
-
 // Normalize free-text values before applying browser-side search filters.
 function normalizeSearchValue(value: unknown) {
   return String(value ?? '')
     .trim()
     .toLowerCase()
-}
-
-// Render a label/value row inside artist and related-artwork modals.
-function ArtistInfoRow({
-  label,
-  value,
-}: {
-  label: string
-  value: unknown
-}) {
-  return (
-    <div className="modal-info-row">
-      <span className="modal-info-label">{label}</span>
-      <span className="modal-info-value">{asDisplayValue(value)}</span>
-    </div>
-  )
 }
 
 // Check whether an artwork item references the same artist by constituent id.
@@ -449,7 +378,7 @@ function ArtistsPage({ authToken, authUser, onAuthUserUpdate }: ArtistsPageProps
   // Redirect logged-out visitors to the login page before any like mutation can run.
   const requireSignedInForLike = () => {
     if (!authToken || !authUser) {
-      window.location.hash = '/login'
+      redirectToLoginWithNotice('Please sign in to like items.')
       return false
     }
 
@@ -877,7 +806,7 @@ function ArtistsPage({ authToken, authUser, onAuthUserUpdate }: ArtistsPageProps
     selectedArtist === null
       ? []
       : Object.entries(selectedArtist).filter(([key, value]) => {
-          if (ARTIST_HIDDEN_FIELDS.has(key)) {
+          if (ARTIST_DETAIL_HIDDEN_FIELDS.has(key)) {
             return false
           }
 
@@ -888,7 +817,7 @@ function ArtistsPage({ authToken, authUser, onAuthUserUpdate }: ArtistsPageProps
     selectedRelatedArtwork === null
       ? []
       : Object.entries(selectedRelatedArtwork).filter(([key, value]) => {
-          if (ARTWORK_HIDDEN_FIELDS.has(key)) {
+          if (ARTWORK_DETAIL_HIDDEN_FIELDS.has(key)) {
             return false
           }
 
@@ -1016,351 +945,98 @@ function ArtistsPage({ authToken, authUser, onAuthUserUpdate }: ArtistsPageProps
         onClose={closeDetails}
       >
         {selectedRelatedArtwork ? (
-          <div className="modal-content artwork-modal-layout">
-            <div className="artwork-main-grid">
-              <section className="modal-section modal-section-with-like">
-                <h3 className="modal-section-title">Artwork Information</h3>
-                <div className="modal-info-grid">
-                  <ArtistInfoRow label="Title" value={selectedRelatedArtwork.Title} />
-                  <ArtistInfoRow
-                    label="Artist"
-                    value={getArtistLabel(selectedRelatedArtwork.Artist)}
-                  />
-                  <ArtistInfoRow label="Date" value={selectedRelatedArtwork.Date} />
-                  <ArtistInfoRow label="Medium" value={selectedRelatedArtwork.Medium} />
-                  <ArtistInfoRow
-                    label="Classification"
-                    value={selectedRelatedArtwork.Classification}
-                  />
-                  <ArtistInfoRow
-                    label="Department"
-                    value={selectedRelatedArtwork.Department}
-                  />
-                  <ArtistInfoRow
-                    label="Accession Number"
-                    value={selectedRelatedArtwork.AccessionNumber}
-                  />
-                  <ArtistInfoRow
-                    label="Object ID"
-                    value={selectedRelatedArtwork.ObjectID}
-                  />
-                  <ArtistInfoRow
-                    label="Likes"
-                    value={selectedRelatedArtwork.Likes ?? 0}
-                  />
-                </div>
-                <button
-                  type="button"
-                  className={`modal-section-like-btn ${
-                    isSelectedRelatedArtworkLiked ? 'liked' : ''
-                  }`}
-                  onClick={(event) =>
-                    handleRelatedArtworkLike(event, selectedRelatedArtwork)
-                  }
-                  aria-label={
-                    authUser
-                      ? `${
-                          isSelectedRelatedArtworkLiked ? 'Unlike' : 'Like'
-                        } ${selectedRelatedArtwork.Title || 'artwork'}`
-                      : `Sign in to like ${selectedRelatedArtwork.Title || 'artwork'}`
-                  }
-                  title={
-                    authUser
-                      ? isSelectedRelatedArtworkLiked
-                        ? 'Unlike'
-                        : 'Like'
-                      : 'Sign in to like'
-                  }
-                >
-                  {isSelectedRelatedArtworkLiked ? '\u2665' : '\u2661'}
-                </button>
-              </section>
-
-              <section className="modal-section artwork-image-section">
-                <h3 className="modal-section-title">Artwork Image</h3>
-                {selectedRelatedArtwork.ImageURL ? (
-                  <img
-                    src={selectedRelatedArtwork.ImageURL}
-                    alt={selectedRelatedArtwork.Title || 'Artwork image'}
-                    className="modal-artwork-image"
-                  />
-                ) : (
-                  <div className="modal-artwork-image-empty">No image available</div>
-                )}
-              </section>
-            </div>
-
-            <section className="modal-section">
-              <h3 className="modal-section-title">Dimensions & Gallery Status</h3>
-              <div className="modal-info-grid">
-                <ArtistInfoRow
-                  label="Dimensions"
-                  value={selectedRelatedArtwork.Dimensions}
-                />
-                <ArtistInfoRow
-                  label="Height (cm)"
-                  value={selectedRelatedArtwork['Height (cm)']}
-                />
-                <ArtistInfoRow
-                  label="Width (cm)"
-                  value={selectedRelatedArtwork['Width (cm)']}
-                />
-                <ArtistInfoRow
-                  label="Depth (cm)"
-                  value={selectedRelatedArtwork['Depth (cm)']}
-                />
-                <ArtistInfoRow label="On View" value={selectedRelatedArtwork.OnView} />
-                <ArtistInfoRow
-                  label="Date Acquired"
-                  value={selectedRelatedArtwork.DateAcquired}
-                />
-                <ArtistInfoRow
-                  label="Cataloged"
-                  value={selectedRelatedArtwork.Cataloged}
-                />
-              </div>
-              <p className="modal-bio">
-                <span className="modal-info-label">Credit Line:</span>{' '}
-                {asDisplayValue(selectedRelatedArtwork.CreditLine)}
-              </p>
-            </section>
-
-            <section className="modal-section">
-              <h3 className="modal-section-title">Links</h3>
-              <div className="modal-info-grid">
-                <div className="modal-info-row">
-                  <span className="modal-info-label">Artwork URL</span>
-                  <span className="modal-info-value">
-                    {typeof selectedRelatedArtwork.URL === 'string' &&
-                    selectedRelatedArtwork.URL ? (
-                      <a
-                        href={selectedRelatedArtwork.URL}
-                        target="_blank"
-                        rel="noreferrer"
-                        className="modal-link"
-                      >
-                        Open artwork link
-                      </a>
-                    ) : (
-                      'N/A'
-                    )}
-                  </span>
-                </div>
-                <div className="modal-info-row">
-                  <span className="modal-info-label">Image URL</span>
-                  <span className="modal-info-value">
-                    {typeof selectedRelatedArtwork.ImageURL === 'string' &&
-                    selectedRelatedArtwork.ImageURL ? (
-                      <a
-                        href={selectedRelatedArtwork.ImageURL}
-                        target="_blank"
-                        rel="noreferrer"
-                        className="modal-link"
-                      >
-                        Open image link
-                      </a>
-                    ) : (
-                      'N/A'
-                    )}
-                  </span>
-                </div>
-              </div>
-            </section>
-
-            {extraRelatedArtworkFields.length > 0 && (
-              <section className="modal-section">
-                <h3 className="modal-section-title">Additional Details</h3>
-                <div className="details-list">
-                  {extraRelatedArtworkFields.map(([key, value]) => (
-                    <div className="details-row" key={key}>
-                      <div className="details-key">{key}</div>
-                      <div className="details-value">{asDisplayValue(value)}</div>
-                    </div>
-                  ))}
-                </div>
-              </section>
-            )}
-          </div>
+          <ArtworkDetailsContent
+            artwork={selectedRelatedArtwork}
+            extraFields={extraRelatedArtworkFields}
+            isLiked={isSelectedRelatedArtworkLiked}
+            onToggleLike={handleRelatedArtworkLike}
+            likeAriaLabel={
+              authUser
+                ? `${isSelectedRelatedArtworkLiked ? 'Unlike' : 'Like'} ${
+                    selectedRelatedArtwork.Title || 'artwork'
+                  }`
+                : `Sign in to like ${selectedRelatedArtwork.Title || 'artwork'}`
+            }
+            likeTitle={
+              authUser
+                ? isSelectedRelatedArtworkLiked
+                  ? 'Unlike'
+                  : 'Like'
+                : 'Sign in to like'
+            }
+          />
         ) : (
           selectedArtist && (
-          <div className="modal-content">
-            <div className="detail-toolbar">
-              <button
-                type="button"
-                className="detail-action-btn"
-                onClick={() => openEditArtistEditor(selectedArtist)}
-              >
-                Edit Artist
-              </button>
-              <button
-                type="button"
-                className="detail-action-btn detail-action-btn-danger"
-                onClick={handleDeleteArtist}
-              >
-                Delete Artist
-              </button>
-            </div>
-            <section className="modal-section modal-section-with-like">
-              <h3 className="modal-section-title">Artist Information</h3>
-              <div className="modal-info-grid">
-                <ArtistInfoRow label="Name" value={selectedArtist.DisplayName} />
-                <ArtistInfoRow
-                  label="Nationality"
-                  value={selectedArtist.Nationality}
-                />
-                <ArtistInfoRow label="Gender" value={selectedArtist.Gender} />
-                <ArtistInfoRow
-                  label="Constituent ID"
-                  value={selectedArtist.ConstituentID}
-                />
-                <ArtistInfoRow
-                  label="Life Span"
-                  value={`${asDisplayValue(selectedArtist.BeginDate)} - ${asDisplayValue(
-                    selectedArtist.EndDate
-                  )}`}
-                />
-                <ArtistInfoRow label="Likes" value={selectedArtist.Likes ?? 0} />
-              </div>
-              <button
-                type="button"
-                className={`modal-section-like-btn ${
-                  isSelectedArtistLiked ? 'liked' : ''
-                }`}
-                onClick={(event) => handleLike(event, selectedArtist)}
-                aria-label={
-                  authUser
-                    ? `${
-                        isSelectedArtistLiked ? 'Unlike' : 'Like'
-                      } ${selectedArtist.DisplayName || 'artist'}`
-                    : `Sign in to like ${selectedArtist.DisplayName || 'artist'}`
-                }
-                title={
-                  authUser
-                    ? isSelectedArtistLiked
-                      ? 'Unlike'
-                      : 'Like'
-                    : 'Sign in to like'
-                }
-              >
-                {isSelectedArtistLiked ? '\u2665' : '\u2661'}
-              </button>
-              <p className="modal-bio">
-                <span className="modal-info-label">Biography:</span>{' '}
-                {asDisplayValue(selectedArtist.ArtistBio)}
-              </p>
-            </section>
+            <ArtistDetailsContent
+              artist={selectedArtist}
+              extraFields={extraArtistFields}
+              isLiked={isSelectedArtistLiked}
+              onToggleLike={handleLike}
+              likeAriaLabel={
+                authUser
+                  ? `${isSelectedArtistLiked ? 'Unlike' : 'Like'} ${
+                      selectedArtist.DisplayName || 'artist'
+                    }`
+                  : `Sign in to like ${selectedArtist.DisplayName || 'artist'}`
+              }
+              likeTitle={
+                authUser
+                  ? isSelectedArtistLiked
+                    ? 'Unlike'
+                    : 'Like'
+                  : 'Sign in to like'
+              }
+              relatedArtwork={relatedArtwork}
+              relatedArtworkItems={carouselItems}
+              relatedLoading={relatedLoading}
+              relatedCarouselPage={carouselPage}
+              relatedCarouselMaxPage={carouselMaxPage}
+              onPreviousRelatedPage={() =>
+                setCarouselPage((prev) => Math.max(0, prev - 1))
+              }
+              onNextRelatedPage={() =>
+                setCarouselPage((prev) => Math.min(carouselMaxPage, prev + 1))
+              }
+              onOpenRelatedArtwork={openRelatedArtworkDetails}
+              renderRelatedArtworkCardActions={(item) => {
+                const isLiked = likedRelatedArtworkIds.has(item._id)
+                const likeActionLabel = authUser
+                  ? `${isLiked ? 'Unlike' : 'Like'} ${item.Title || 'artwork'}`
+                  : `Sign in to like ${item.Title || 'artwork'}`
 
-            <section className="modal-section">
-              <h3 className="modal-section-title">Identifiers</h3>
-              <div className="modal-info-grid">
-                <ArtistInfoRow label="ULAN" value={selectedArtist.ULAN} />
-                <ArtistInfoRow label="Wiki QID" value={selectedArtist['Wiki QID']} />
-              </div>
-            </section>
-
-            <section className="modal-section">
-              <h3 className="modal-section-title">Artwork By This Artist</h3>
-              {relatedLoading ? (
-                <p className="modal-status">Loading artwork for this artist...</p>
-              ) : relatedArtwork.length === 0 ? (
-                <p className="modal-status">
-                  No related artwork found in the current dataset.
-                </p>
-              ) : (
-                <div className="carousel-wrapper">
-                  <div className="carousel-controls">
-                    <button
-                      type="button"
-                      className="carousel-btn"
-                      onClick={() => setCarouselPage((prev) => Math.max(0, prev - 1))}
-                      disabled={carouselPage === 0}
-                    >
-                      Prev
-                    </button>
-                    <span className="carousel-count">
-                      {carouselPage + 1} / {carouselMaxPage + 1}
-                    </span>
-                    <button
-                      type="button"
-                      className="carousel-btn"
-                      onClick={() =>
-                        setCarouselPage((prev) => Math.min(carouselMaxPage, prev + 1))
-                      }
-                      disabled={carouselPage >= carouselMaxPage}
-                    >
-                      Next
-                    </button>
-                  </div>
-                  <div className="carousel-grid">
-                    {carouselItems.map((item) => {
-                      const isLiked = likedRelatedArtworkIds.has(item._id)
-                      const likeActionLabel = authUser
-                        ? `${isLiked ? 'Unlike' : 'Like'} ${item.Title || 'artwork'}`
-                        : `Sign in to like ${item.Title || 'artwork'}`
-
-                      return (
-                      <article
-                        className="card"
-                        key={item._id}
-                        onClick={() => openRelatedArtworkDetails(item)}
-                        role="button"
-                        tabIndex={0}
-                        onKeyDown={(event) => {
-                          if (event.key === 'Enter' || event.key === ' ') {
-                            event.preventDefault()
-                            openRelatedArtworkDetails(item)
-                          }
-                        }}
-                      >
-                        {item.ImageURL ? (
-                          <img
-                            src={item.ImageURL}
-                            alt={item.Title || 'Artwork'}
-                            className="card-image"
-                            loading="lazy"
-                          />
-                        ) : (
-                          <div className="card-image card-image-empty">
-                            No image
-                          </div>
-                        )}
-                        <h4 className="card-title">{item.Title || 'Untitled'}</h4>
-                        <p className="card-meta">{getArtistLabel(item.Artist)}</p>
-                        <p className="card-meta">{item.Date || 'Unknown date'}</p>
-                        <p className="card-likes">Likes: {item.Likes ?? 0}</p>
-                        <button
-                          type="button"
-                          className={`card-heart-btn ${isLiked ? 'liked' : ''}`}
-                          onClick={(event) => handleRelatedArtworkLike(event, item)}
-                          aria-label={likeActionLabel}
-                          title={
-                            authUser ? (isLiked ? 'Unlike' : 'Like') : 'Sign in to like'
-                          }
-                        >
-                          {isLiked ? '\u2665' : '\u2661'}
-                        </button>
-                      </article>
-                      )
-                    })}
-                  </div>
+                return (
+                  <button
+                    type="button"
+                    className={`card-heart-btn ${isLiked ? 'liked' : ''}`}
+                    onClick={(event) => handleRelatedArtworkLike(event, item)}
+                    aria-label={likeActionLabel}
+                    title={
+                      authUser ? (isLiked ? 'Unlike' : 'Like') : 'Sign in to like'
+                    }
+                  >
+                    {isLiked ? '\u2665' : '\u2661'}
+                  </button>
+                )
+              }}
+              toolbar={
+                <div className="detail-toolbar">
+                  <button
+                    type="button"
+                    className="detail-action-btn"
+                    onClick={() => openEditArtistEditor(selectedArtist)}
+                  >
+                    Edit Artist
+                  </button>
+                  <button
+                    type="button"
+                    className="detail-action-btn detail-action-btn-danger"
+                    onClick={handleDeleteArtist}
+                  >
+                    Delete Artist
+                  </button>
                 </div>
-              )}
-            </section>
-
-            {extraArtistFields.length > 0 && (
-              <section className="modal-section">
-                <h3 className="modal-section-title">Additional Details</h3>
-                <div className="details-list">
-                  {extraArtistFields.map(([key, value]) => (
-                    <div className="details-row" key={key}>
-                      <div className="details-key">{key}</div>
-                      <div className="details-value">{asDisplayValue(value)}</div>
-                    </div>
-                  ))}
-                </div>
-              </section>
-            )}
-          </div>
+              }
+            />
           )
         )}
       </DetailsModal>

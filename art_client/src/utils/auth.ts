@@ -3,6 +3,7 @@ import type { AuthResponse, CurrentUserResponse } from '../types/auth'
 const JSON_HEADERS = {
   'Content-Type': 'application/json',
 }
+const AUTH_REDIRECT_NOTICE_KEY = 'authRedirectNotice'
 
 function getAuthorizedJsonHeaders(token: string) {
   return {
@@ -142,4 +143,20 @@ export async function setCurrentUserArtworkLike(
   )
 
   return response.user
+}
+
+// Store a one-time auth notice so the login page can explain why the redirect happened.
+export function redirectToLoginWithNotice(message: string) {
+  sessionStorage.setItem(AUTH_REDIRECT_NOTICE_KEY, message)
+  window.location.hash = '/login'
+}
+
+// Read and clear the last auth redirect notice after the login page loads.
+export function consumeAuthRedirectNotice() {
+  const notice = sessionStorage.getItem(AUTH_REDIRECT_NOTICE_KEY) || ''
+  if (notice) {
+    sessionStorage.removeItem(AUTH_REDIRECT_NOTICE_KEY)
+  }
+
+  return notice
 }

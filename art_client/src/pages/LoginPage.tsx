@@ -1,7 +1,7 @@
-import { useState } from 'react'
+import { useEffect, useState } from 'react'
 import type { FormEvent } from 'react'
 import AuthPageLayout from '../components/AuthPageLayout'
-import { loginUser } from '../utils/auth'
+import { consumeAuthRedirectNotice, loginUser } from '../utils/auth'
 import type { AuthResponse } from '../types/auth'
 
 type LoginPageProps = {
@@ -12,8 +12,13 @@ type LoginPageProps = {
 function LoginPage({ onAuthSuccess }: LoginPageProps) {
   const [email, setEmail] = useState('')
   const [password, setPassword] = useState('')
+  const [notice, setNotice] = useState('')
   const [submitting, setSubmitting] = useState(false)
   const [error, setError] = useState('')
+
+  useEffect(() => {
+    setNotice(consumeAuthRedirectNotice())
+  }, [])
 
   // Submit the login form and surface API validation errors back into the page.
   const handleSubmit = async (event: FormEvent<HTMLFormElement>) => {
@@ -44,6 +49,8 @@ function LoginPage({ onAuthSuccess }: LoginPageProps) {
       subtitle="Sign in to keep your likes and account details tied to one profile."
     >
       <form className="auth-form" onSubmit={handleSubmit}>
+        {notice && <p className="auth-notice">{notice}</p>}
+
         <label className="auth-field">
           <span className="auth-label">Email</span>
           <input

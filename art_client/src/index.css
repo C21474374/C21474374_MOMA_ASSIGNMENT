@@ -564,6 +564,11 @@ body {
   background: #ffe4e4;
 }
 
+.card-heart-btn:disabled {
+  opacity: 0.6;
+  cursor: wait;
+}
+
 .show-more-btn {
   margin-top: 20px;
   padding: 10px 14px;
@@ -1185,6 +1190,7 @@ body {
   padding: 14px 16px;
 }
 
+.auth-page .auth-notice,
 .auth-page .auth-error,
 .auth-page .auth-footer {
   font-size: 16px;
@@ -1328,6 +1334,16 @@ body {
   border: 1px solid #c81d25;
   background: #fff4f4;
   color: #9b1320;
+  font-size: 14px;
+  font-weight: 700;
+}
+
+.auth-notice {
+  margin: 0;
+  padding: 12px 14px;
+  border: 1px solid #000000;
+  background: #f4f4f4;
+  color: #000000;
   font-size: 14px;
   font-weight: 700;
 }

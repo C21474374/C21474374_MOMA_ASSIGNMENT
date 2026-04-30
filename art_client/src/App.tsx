@@ -258,6 +258,7 @@ function App() {
           authToken={authToken}
           user={authUser}
           onAuthSuccess={handleAuthSuccess}
+          onAuthUserUpdate={handleAuthUserUpdate}
           onAccountDeleted={handleLogout}
         />
       )
