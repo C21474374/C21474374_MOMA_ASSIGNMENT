@@ -212,6 +212,11 @@ function App() {
     window.location.hash = '/home'
   }
 
+  // Keep the top-level account state in sync after profile and like updates.
+  const handleAuthUserUpdate = (user: AuthUser) => {
+    setAuthUser(user)
+  }
+
   const accountLabel = authUser?.displayName?.trim() || authUser?.email || 'Account'
 
   // Render the shared navigation links for both desktop and mobile layouts.
@@ -230,7 +235,13 @@ function App() {
   // Pick the page component that matches the current hash-based route.
   const page = useMemo(() => {
     if (view === 'home') {
-      return <HomePage />
+      return (
+        <HomePage
+          authToken={authToken}
+          authUser={authUser}
+          onAuthUserUpdate={handleAuthUserUpdate}
+        />
+      )
     }
     if (view === 'about') {
       return <AboutPage />
@@ -242,13 +253,32 @@ function App() {
       return <RegisterPage onAuthSuccess={handleAuthSuccess} />
     }
     if (view === 'account') {
-      return <AccountSettingsPage user={authUser} />
+      return (
+        <AccountSettingsPage
+          authToken={authToken}
+          user={authUser}
+          onAuthSuccess={handleAuthSuccess}
+          onAccountDeleted={handleLogout}
+        />
+      )
     }
     if (view === 'artwork') {
-      return <ArtworkPage />
+      return (
+        <ArtworkPage
+          authToken={authToken}
+          authUser={authUser}
+          onAuthUserUpdate={handleAuthUserUpdate}
+        />
+      )
     }
-    return <ArtistsPage />
-  }, [authUser, view])
+    return (
+      <ArtistsPage
+        authToken={authToken}
+        authUser={authUser}
+        onAuthUserUpdate={handleAuthUserUpdate}
+      />
+    )
+  }, [authToken, authUser, view])
 
   return (
     <>

@@ -2,6 +2,8 @@ import { useEffect, useMemo, useState } from 'react'
 import type { MouseEvent } from 'react'
 import CrudFormModal, { type CrudFormField } from '../components/CrudFormModal'
 import DetailsModal from '../components/DetailsModal'
+import type { AuthUser } from '../types/auth'
+import { setCurrentUserArtworkLike } from '../utils/auth'
 
 const PAGE_SIZE = 50
 
@@ -263,8 +265,14 @@ function ArtworkInfoRow({
   )
 }
 
+type ArtworkPageProps = {
+  authToken: string | null
+  authUser: AuthUser | null
+  onAuthUserUpdate: (user: AuthUser) => void
+}
+
 // Render the main artwork collection page, including filters, CRUD actions, and detail flows.
-function ArtworkPage() {
+function ArtworkPage({ authToken, authUser, onAuthUserUpdate }: ArtworkPageProps) {
   const [artwork, setArtwork] = useState<Artwork[]>([])
   const [visibleCount, setVisibleCount] = useState(PAGE_SIZE)
   const [searchTerm, setSearchTerm] = useState('')
@@ -328,6 +336,15 @@ function ArtworkPage() {
     setVisibleCount(PAGE_SIZE)
   }, [dateFilter, departmentFilter, searchTerm])
 
+  useEffect(() => {
+    if (!authUser) {
+      setLikedArtworkIds(new Set())
+      return
+    }
+
+    setLikedArtworkIds(new Set(authUser.likedArtworkIds))
+  }, [authUser])
+
   // Build the department filter options from the current dataset.
   const departmentOptions = useMemo(() => {
     return Array.from(
@@ -375,6 +392,16 @@ function ArtworkPage() {
 
   const visibleArtwork = filteredArtwork.slice(0, visibleCount)
   const canShowMore = visibleCount < filteredArtwork.length
+
+  // Redirect logged-out visitors to the login page before any like mutation can run.
+  const requireSignedInForLike = () => {
+    if (!authToken || !authUser) {
+      window.location.hash = '/login'
+      return false
+    }
+
+    return true
+  }
 
   // Close the artwork detail modal.
   const closeDetails = () => {
@@ -514,17 +541,21 @@ function ArtworkPage() {
   // Optimistically toggle likes for artwork and persist the new count through the API.
   const handleLike = async (event: MouseEvent<HTMLButtonElement>, item: Artwork) => {
     event.stopPropagation()
+    if (!requireSignedInForLike()) {
+      return
+    }
 
     const isCurrentlyLiked = likedArtworkIds.has(item._id)
     const currentLikes = Math.max(0, Number(item.Likes ?? 0))
     const nextLikes = Math.max(0, currentLikes + (isCurrentlyLiked ? -1 : 1))
+    const shouldLike = !isCurrentlyLiked
 
     setLikedArtworkIds((prev) => {
       const next = new Set(prev)
-      if (isCurrentlyLiked) {
-        next.delete(item._id)
-      } else {
+      if (shouldLike) {
         next.add(item._id)
+      } else {
+        next.delete(item._id)
       }
       return next
     })
@@ -536,7 +567,19 @@ function ArtworkPage() {
       prev && prev._id === item._id ? { ...prev, Likes: nextLikes } : prev
     )
 
+    let syncedAccountLike = false
+
     try {
+      if (authToken && authUser) {
+        const updatedUser = await setCurrentUserArtworkLike(
+          authToken,
+          item._id,
+          shouldLike
+        )
+        onAuthUserUpdate(updatedUser)
+        syncedAccountLike = true
+      }
+
       const response = await fetch(`/api/artwork/${item._id}`, {
         method: 'PUT',
         headers: { 'Content-Type': 'application/json' },
@@ -555,12 +598,25 @@ function ArtworkPage() {
         prev && prev._id === item._id ? updatedArtwork : prev
       )
     } catch {
+      if (syncedAccountLike && authToken && authUser) {
+        try {
+          const revertedUser = await setCurrentUserArtworkLike(
+            authToken,
+            item._id,
+            isCurrentlyLiked
+          )
+          onAuthUserUpdate(revertedUser)
+        } catch {
+          // Keep the local fallback below if the rollback request also fails.
+        }
+      }
+
       setLikedArtworkIds((prev) => {
         const next = new Set(prev)
-        if (isCurrentlyLiked) {
-          next.add(item._id)
-        } else {
+        if (shouldLike) {
           next.delete(item._id)
+        } else {
+          next.add(item._id)
         }
         return next
       })
@@ -653,6 +709,9 @@ function ArtworkPage() {
       <div className="card-grid">
         {visibleArtwork.map((item) => {
           const isLiked = likedArtworkIds.has(item._id)
+          const likeActionLabel = authUser
+            ? `${isLiked ? 'Unlike' : 'Like'} ${item.Title || 'artwork'}`
+            : `Sign in to like ${item.Title || 'artwork'}`
 
           return (
           <article
@@ -686,10 +745,8 @@ function ArtworkPage() {
               type="button"
               className={`card-heart-btn ${isLiked ? 'liked' : ''}`}
               onClick={(event) => handleLike(event, item)}
-              aria-label={`${isLiked ? 'Unlike' : 'Like'} ${
-                item.Title || 'artwork'
-              }`}
-              title={isLiked ? 'Unlike' : 'Like'}
+              aria-label={likeActionLabel}
+              title={authUser ? (isLiked ? 'Unlike' : 'Like') : 'Sign in to like'}
             >
               {isLiked ? '\u2665' : '\u2661'}
             </button>
@@ -762,10 +819,20 @@ function ArtworkPage() {
                     isSelectedArtworkLiked ? 'liked' : ''
                   }`}
                   onClick={(event) => handleLike(event, selectedArtwork)}
-                  aria-label={`${
-                    isSelectedArtworkLiked ? 'Unlike' : 'Like'
-                  } ${selectedArtwork.Title || 'artwork'}`}
-                  title={isSelectedArtworkLiked ? 'Unlike' : 'Like'}
+                  aria-label={
+                    authUser
+                      ? `${
+                          isSelectedArtworkLiked ? 'Unlike' : 'Like'
+                        } ${selectedArtwork.Title || 'artwork'}`
+                      : `Sign in to like ${selectedArtwork.Title || 'artwork'}`
+                  }
+                  title={
+                    authUser
+                      ? isSelectedArtworkLiked
+                        ? 'Unlike'
+                        : 'Like'
+                      : 'Sign in to like'
+                  }
                 >
                   {isSelectedArtworkLiked ? '\u2665' : '\u2661'}
                 </button>

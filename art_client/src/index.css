@@ -1212,6 +1212,56 @@ body {
   line-height: 1.6;
 }
 
+.account-page {
+  display: flex;
+  flex-direction: column;
+  gap: 36px;
+}
+
+.account-form {
+  gap: 14px;
+}
+
+.account-edit-row .auth-input {
+  margin-top: 2px;
+}
+
+.account-form-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 12px;
+}
+
+.account-profile-actions {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: flex-end;
+  gap: 12px;
+  margin-top: 8px;
+}
+
+.account-success {
+  margin: 0;
+  padding: 12px 14px;
+  border: 1px solid #1f7a39;
+  background: #f2fff5;
+  color: #16592a;
+  font-size: 15px;
+  font-weight: 700;
+}
+
+.account-danger-panel {
+  justify-content: space-between;
+}
+
+.account-danger-copy {
+  max-width: 48ch;
+}
+
+.account-liked-section {
+  gap: 18px;
+}
+
 .auth-page {
   display: flex;
   justify-content: center;

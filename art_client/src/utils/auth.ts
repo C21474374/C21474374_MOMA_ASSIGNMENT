@@ -4,6 +4,13 @@ const JSON_HEADERS = {
   'Content-Type': 'application/json',
 }
 
+function getAuthorizedJsonHeaders(token: string) {
+  return {
+    ...JSON_HEADERS,
+    Authorization: `Bearer ${token}`,
+  }
+}
+
 // Safely parse JSON only when the server actually returned a JSON payload.
 async function parseResponseJson<T>(response: Response) {
   const contentType = response.headers.get('content-type') || ''
@@ -28,6 +35,16 @@ async function requestJson<T>(input: RequestInfo | URL, init?: RequestInit) {
   }
 
   return payload as T
+}
+
+// Wrap fetch for endpoints that intentionally return no response body on success.
+async function requestEmpty(input: RequestInfo | URL, init?: RequestInit) {
+  const response = await fetch(input, init)
+  const payload = await parseResponseJson<{ error?: string }>(response)
+
+  if (!response.ok) {
+    throw new Error(payload?.error || `Request failed with status ${response.status}`)
+  }
 }
 
 // Call the register endpoint and return the auth session payload.
@@ -59,6 +76,70 @@ export async function getCurrentUser(token: string) {
       Authorization: `Bearer ${token}`,
     },
   })
+
+  return response.user
+}
+
+// Update the current user profile and return the refreshed auth payload.
+export async function updateCurrentUser(
+  token: string,
+  input: {
+    email?: string
+    displayName?: string
+    password?: string
+  },
+) {
+  return requestJson<AuthResponse>('/api/auth/me', {
+    method: 'PUT',
+    headers: getAuthorizedJsonHeaders(token),
+    body: JSON.stringify(input),
+  })
+}
+
+// Delete the currently authenticated account.
+export async function deleteCurrentUser(token: string) {
+  return requestEmpty('/api/auth/me', {
+    method: 'DELETE',
+    headers: {
+      Authorization: `Bearer ${token}`,
+    },
+  })
+}
+
+// Add or remove an artist id on the signed-in user's liked list.
+export async function setCurrentUserArtistLike(
+  token: string,
+  artistId: string,
+  shouldLike: boolean,
+) {
+  const response = await requestJson<CurrentUserResponse>(
+    `/api/auth/me/likes/artists/${artistId}`,
+    {
+      method: shouldLike ? 'PUT' : 'DELETE',
+      headers: {
+        Authorization: `Bearer ${token}`,
+      },
+    },
+  )
+
+  return response.user
+}
+
+// Add or remove an artwork id on the signed-in user's liked list.
+export async function setCurrentUserArtworkLike(
+  token: string,
+  artworkId: string,
+  shouldLike: boolean,
+) {
+  const response = await requestJson<CurrentUserResponse>(
+    `/api/auth/me/likes/artwork/${artworkId}`,
+    {
+      method: shouldLike ? 'PUT' : 'DELETE',
+      headers: {
+        Authorization: `Bearer ${token}`,
+      },
+    },
+  )
 
   return response.user
 }

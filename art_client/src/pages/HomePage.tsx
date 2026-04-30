@@ -2,6 +2,11 @@ import { useEffect, useMemo, useRef, useState } from 'react'
 import type { MouseEvent, RefObject } from 'react'
 import DetailsModal from '../components/DetailsModal'
 import momaHeroImage from '../assets/moma_pic_irl.jpg'
+import type { AuthUser } from '../types/auth'
+import {
+  setCurrentUserArtistLike,
+  setCurrentUserArtworkLike,
+} from '../utils/auth'
 
 const FEATURE_LIMIT = 12
 const RELATED_ARTWORK_LIMIT = 200
@@ -199,8 +204,14 @@ function scrollTrack(
   })
 }
 
+type HomePageProps = {
+  authToken: string | null
+  authUser: AuthUser | null
+  onAuthUserUpdate: (user: AuthUser) => void
+}
+
 // Render the homepage hero, highlight carousels, about teaser, and shared detail flows.
-function HomePage() {
+function HomePage({ authToken, authUser, onAuthUserUpdate }: HomePageProps) {
   const [artwork, setArtwork] = useState<ArtworkSummary[]>([])
   const [artists, setArtists] = useState<Artist[]>([])
   const [likedArtworkIds, setLikedArtworkIds] = useState<Set<string>>(new Set())
@@ -222,6 +233,20 @@ function HomePage() {
   const [error, setError] = useState('')
   const artworkTrackRef = useRef<HTMLDivElement | null>(null)
   const artistTrackRef = useRef<HTMLDivElement | null>(null)
+
+  useEffect(() => {
+    if (!authUser) {
+      setLikedArtworkIds(new Set())
+      setLikedArtistIds(new Set())
+      setLikedRelatedArtworkIds(new Set())
+      return
+    }
+
+    const likedArtworkSet = new Set(authUser.likedArtworkIds)
+    setLikedArtworkIds(likedArtworkSet)
+    setLikedArtistIds(new Set(authUser.likedArtistIds))
+    setLikedRelatedArtworkIds(new Set(authUser.likedArtworkIds))
+  }, [authUser])
 
   useEffect(() => {
     let isMounted = true
@@ -288,6 +313,29 @@ function HomePage() {
     )
   }
 
+  // Keep both homepage artwork like sets in sync for main and nested artwork views.
+  const updateArtworkLikeSets = (artworkId: string, shouldLike: boolean) => {
+    setLikedArtworkIds((prev) => {
+      const next = new Set(prev)
+      if (shouldLike) {
+        next.add(artworkId)
+      } else {
+        next.delete(artworkId)
+      }
+      return next
+    })
+
+    setLikedRelatedArtworkIds((prev) => {
+      const next = new Set(prev)
+      if (shouldLike) {
+        next.add(artworkId)
+      } else {
+        next.delete(artworkId)
+      }
+      return next
+    })
+  }
+
   // Keep homepage artist cards and the active artist modal in sync.
   const updateArtistState = (artistId: string, changes: Partial<Artist>) => {
     setArtists((prev) =>
@@ -296,6 +344,16 @@ function HomePage() {
     setSelectedArtist((prev) =>
       prev && prev._id === artistId ? { ...prev, ...changes } : prev
     )
+  }
+
+  // Redirect logged-out visitors to the login page before any like mutation can run.
+  const requireSignedInForLike = () => {
+    if (!authToken || !authUser) {
+      window.location.hash = '/login'
+      return false
+    }
+
+    return true
   }
 
   // Close the artwork detail modal shown from the homepage.
@@ -427,24 +485,32 @@ function HomePage() {
     item: ArtworkSummary
   ) => {
     event.stopPropagation()
+    if (!requireSignedInForLike()) {
+      return
+    }
 
     const isCurrentlyLiked = likedArtworkIds.has(item._id)
     const currentLikes = Math.max(0, Number(item.Likes ?? 0))
     const nextLikes = Math.max(0, currentLikes + (isCurrentlyLiked ? -1 : 1))
+    const shouldLike = !isCurrentlyLiked
 
-    setLikedArtworkIds((prev) => {
-      const next = new Set(prev)
-      if (isCurrentlyLiked) {
-        next.delete(item._id)
-      } else {
-        next.add(item._id)
-      }
-      return next
-    })
+    updateArtworkLikeSets(item._id, shouldLike)
 
     updateArtworkState(item._id, { Likes: nextLikes })
 
+    let syncedAccountLike = false
+
     try {
+      if (authToken && authUser) {
+        const updatedUser = await setCurrentUserArtworkLike(
+          authToken,
+          item._id,
+          shouldLike
+        )
+        onAuthUserUpdate(updatedUser)
+        syncedAccountLike = true
+      }
+
       const response = await fetch(`/api/artwork/${item._id}`, {
         method: 'PUT',
         headers: { 'Content-Type': 'application/json' },
@@ -458,15 +524,20 @@ function HomePage() {
       const updatedArtwork = (await response.json()) as ArtworkSummary
       updateArtworkState(item._id, updatedArtwork)
     } catch {
-      setLikedArtworkIds((prev) => {
-        const next = new Set(prev)
-        if (isCurrentlyLiked) {
-          next.add(item._id)
-        } else {
-          next.delete(item._id)
+      if (syncedAccountLike && authToken && authUser) {
+        try {
+          const revertedUser = await setCurrentUserArtworkLike(
+            authToken,
+            item._id,
+            isCurrentlyLiked
+          )
+          onAuthUserUpdate(revertedUser)
+        } catch {
+          // Keep the local fallback below if the rollback request also fails.
         }
-        return next
-      })
+      }
+
+      updateArtworkLikeSets(item._id, isCurrentlyLiked)
       updateArtworkState(item._id, { Likes: currentLikes })
     }
   }
@@ -477,24 +548,40 @@ function HomePage() {
     artist: Artist
   ) => {
     event.stopPropagation()
+    if (!requireSignedInForLike()) {
+      return
+    }
 
     const isCurrentlyLiked = likedArtistIds.has(artist._id)
     const currentLikes = Math.max(0, Number(artist.Likes ?? 0))
     const nextLikes = Math.max(0, currentLikes + (isCurrentlyLiked ? -1 : 1))
+    const shouldLike = !isCurrentlyLiked
 
     setLikedArtistIds((prev) => {
       const next = new Set(prev)
-      if (isCurrentlyLiked) {
-        next.delete(artist._id)
-      } else {
+      if (shouldLike) {
         next.add(artist._id)
+      } else {
+        next.delete(artist._id)
       }
       return next
     })
 
     updateArtistState(artist._id, { Likes: nextLikes })
 
+    let syncedAccountLike = false
+
     try {
+      if (authToken && authUser) {
+        const updatedUser = await setCurrentUserArtistLike(
+          authToken,
+          artist._id,
+          shouldLike
+        )
+        onAuthUserUpdate(updatedUser)
+        syncedAccountLike = true
+      }
+
       const response = await fetch(`/api/artists/${artist._id}`, {
         method: 'PUT',
         headers: { 'Content-Type': 'application/json' },
@@ -508,12 +595,25 @@ function HomePage() {
       const updatedArtist = (await response.json()) as Artist
       updateArtistState(artist._id, updatedArtist)
     } catch {
+      if (syncedAccountLike && authToken && authUser) {
+        try {
+          const revertedUser = await setCurrentUserArtistLike(
+            authToken,
+            artist._id,
+            isCurrentlyLiked
+          )
+          onAuthUserUpdate(revertedUser)
+        } catch {
+          // Keep the local fallback below if the rollback request also fails.
+        }
+      }
+
       setLikedArtistIds((prev) => {
         const next = new Set(prev)
-        if (isCurrentlyLiked) {
-          next.add(artist._id)
-        } else {
+        if (shouldLike) {
           next.delete(artist._id)
+        } else {
+          next.add(artist._id)
         }
         return next
       })
@@ -527,24 +627,32 @@ function HomePage() {
     item: ArtworkSummary
   ) => {
     event.stopPropagation()
+    if (!requireSignedInForLike()) {
+      return
+    }
 
     const isCurrentlyLiked = likedRelatedArtworkIds.has(item._id)
     const currentLikes = Math.max(0, Number(item.Likes ?? 0))
     const nextLikes = Math.max(0, currentLikes + (isCurrentlyLiked ? -1 : 1))
+    const shouldLike = !isCurrentlyLiked
 
-    setLikedRelatedArtworkIds((prev) => {
-      const next = new Set(prev)
-      if (isCurrentlyLiked) {
-        next.delete(item._id)
-      } else {
-        next.add(item._id)
-      }
-      return next
-    })
+    updateArtworkLikeSets(item._id, shouldLike)
 
     updateArtworkState(item._id, { Likes: nextLikes })
 
+    let syncedAccountLike = false
+
     try {
+      if (authToken && authUser) {
+        const updatedUser = await setCurrentUserArtworkLike(
+          authToken,
+          item._id,
+          shouldLike
+        )
+        onAuthUserUpdate(updatedUser)
+        syncedAccountLike = true
+      }
+
       const response = await fetch(`/api/artwork/${item._id}`, {
         method: 'PUT',
         headers: { 'Content-Type': 'application/json' },
@@ -558,15 +666,20 @@ function HomePage() {
       const updatedArtwork = (await response.json()) as ArtworkSummary
       updateArtworkState(item._id, updatedArtwork)
     } catch {
-      setLikedRelatedArtworkIds((prev) => {
-        const next = new Set(prev)
-        if (isCurrentlyLiked) {
-          next.add(item._id)
-        } else {
-          next.delete(item._id)
+      if (syncedAccountLike && authToken && authUser) {
+        try {
+          const revertedUser = await setCurrentUserArtworkLike(
+            authToken,
+            item._id,
+            isCurrentlyLiked
+          )
+          onAuthUserUpdate(revertedUser)
+        } catch {
+          // Keep the local fallback below if the rollback request also fails.
         }
-        return next
-      })
+      }
+
+      updateArtworkLikeSets(item._id, isCurrentlyLiked)
       updateArtworkState(item._id, { Likes: currentLikes })
     }
   }
@@ -695,6 +808,9 @@ function HomePage() {
           <div className="home-carousel-track" ref={artworkTrackRef}>
             {artwork.map((item) => {
               const isLiked = likedArtworkIds.has(item._id)
+              const likeActionLabel = authUser
+                ? `${isLiked ? 'Unlike' : 'Like'} ${item.Title || 'artwork'}`
+                : `Sign in to like ${item.Title || 'artwork'}`
 
               return (
                 <article
@@ -730,10 +846,8 @@ function HomePage() {
                     type="button"
                     className={`card-heart-btn ${isLiked ? 'liked' : ''}`}
                     onClick={(event) => handleArtworkLike(event, item)}
-                    aria-label={`${isLiked ? 'Unlike' : 'Like'} ${
-                      item.Title || 'artwork'
-                    }`}
-                    title={isLiked ? 'Unlike' : 'Like'}
+                    aria-label={likeActionLabel}
+                    title={authUser ? (isLiked ? 'Unlike' : 'Like') : 'Sign in to like'}
                   >
                     {isLiked ? '\u2665' : '\u2661'}
                   </button>
@@ -787,6 +901,9 @@ function HomePage() {
           <div className="home-carousel-track" ref={artistTrackRef}>
             {artists.map((artist) => {
               const isLiked = likedArtistIds.has(artist._id)
+              const likeActionLabel = authUser
+                ? `${isLiked ? 'Unlike' : 'Like'} ${artist.DisplayName || 'artist'}`
+                : `Sign in to like ${artist.DisplayName || 'artist'}`
 
               return (
                 <article
@@ -817,10 +934,8 @@ function HomePage() {
                     type="button"
                     className={`card-heart-btn ${isLiked ? 'liked' : ''}`}
                     onClick={(event) => handleArtistLike(event, artist)}
-                    aria-label={`${isLiked ? 'Unlike' : 'Like'} ${
-                      artist.DisplayName || 'artist'
-                    }`}
-                    title={isLiked ? 'Unlike' : 'Like'}
+                    aria-label={likeActionLabel}
+                    title={authUser ? (isLiked ? 'Unlike' : 'Like') : 'Sign in to like'}
                   >
                     {isLiked ? '\u2665' : '\u2661'}
                   </button>
@@ -898,10 +1013,20 @@ function HomePage() {
                     isSelectedArtworkLiked ? 'liked' : ''
                   }`}
                   onClick={(event) => handleArtworkLike(event, selectedArtwork)}
-                  aria-label={`${
-                    isSelectedArtworkLiked ? 'Unlike' : 'Like'
-                  } ${selectedArtwork.Title || 'artwork'}`}
-                  title={isSelectedArtworkLiked ? 'Unlike' : 'Like'}
+                  aria-label={
+                    authUser
+                      ? `${
+                          isSelectedArtworkLiked ? 'Unlike' : 'Like'
+                        } ${selectedArtwork.Title || 'artwork'}`
+                      : `Sign in to like ${selectedArtwork.Title || 'artwork'}`
+                  }
+                  title={
+                    authUser
+                      ? isSelectedArtworkLiked
+                        ? 'Unlike'
+                        : 'Like'
+                      : 'Sign in to like'
+                  }
                 >
                   {isSelectedArtworkLiked ? '\u2665' : '\u2661'}
                 </button>
@@ -1058,10 +1183,20 @@ function HomePage() {
                   onClick={(event) =>
                     handleRelatedArtworkLike(event, selectedRelatedArtwork)
                   }
-                  aria-label={`${
-                    isSelectedRelatedArtworkLiked ? 'Unlike' : 'Like'
-                  } ${selectedRelatedArtwork.Title || 'artwork'}`}
-                  title={isSelectedRelatedArtworkLiked ? 'Unlike' : 'Like'}
+                  aria-label={
+                    authUser
+                      ? `${
+                          isSelectedRelatedArtworkLiked ? 'Unlike' : 'Like'
+                        } ${selectedRelatedArtwork.Title || 'artwork'}`
+                      : `Sign in to like ${selectedRelatedArtwork.Title || 'artwork'}`
+                  }
+                  title={
+                    authUser
+                      ? isSelectedRelatedArtworkLiked
+                        ? 'Unlike'
+                        : 'Like'
+                      : 'Sign in to like'
+                  }
                 >
                   {isSelectedRelatedArtworkLiked ? '\u2665' : '\u2661'}
                 </button>
@@ -1199,10 +1334,20 @@ function HomePage() {
                     isSelectedArtistLiked ? 'liked' : ''
                   }`}
                   onClick={(event) => handleArtistLike(event, selectedArtist)}
-                  aria-label={`${
-                    isSelectedArtistLiked ? 'Unlike' : 'Like'
-                  } ${selectedArtist.DisplayName || 'artist'}`}
-                  title={isSelectedArtistLiked ? 'Unlike' : 'Like'}
+                  aria-label={
+                    authUser
+                      ? `${
+                          isSelectedArtistLiked ? 'Unlike' : 'Like'
+                        } ${selectedArtist.DisplayName || 'artist'}`
+                      : `Sign in to like ${selectedArtist.DisplayName || 'artist'}`
+                  }
+                  title={
+                    authUser
+                      ? isSelectedArtistLiked
+                        ? 'Unlike'
+                        : 'Like'
+                      : 'Sign in to like'
+                  }
                 >
                   {isSelectedArtistLiked ? '\u2665' : '\u2661'}
                 </button>
@@ -1260,6 +1405,9 @@ function HomePage() {
                     <div className="carousel-grid">
                       {relatedCarouselItems.map((item) => {
                         const isLiked = likedRelatedArtworkIds.has(item._id)
+                        const likeActionLabel = authUser
+                          ? `${isLiked ? 'Unlike' : 'Like'} ${item.Title || 'artwork'}`
+                          : `Sign in to like ${item.Title || 'artwork'}`
 
                         return (
                           <article
@@ -1297,10 +1445,14 @@ function HomePage() {
                               onClick={(event) =>
                                 handleRelatedArtworkLike(event, item)
                               }
-                              aria-label={`${isLiked ? 'Unlike' : 'Like'} ${
-                                item.Title || 'artwork'
-                              }`}
-                              title={isLiked ? 'Unlike' : 'Like'}
+                              aria-label={likeActionLabel}
+                              title={
+                                authUser
+                                  ? isLiked
+                                    ? 'Unlike'
+                                    : 'Like'
+                                  : 'Sign in to like'
+                              }
                             >
                               {isLiked ? '\u2665' : '\u2661'}
                             </button>
