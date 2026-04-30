@@ -81,6 +81,23 @@ export async function getCurrentUser(token: string) {
   return response.user
 }
 
+// Load small artwork recommendations for the currently signed-in user.
+export async function getCurrentUserArtworkRecommendations<T>(
+  token: string,
+  limit = 12,
+) {
+  const response = await requestJson<{ artwork: T[] }>(
+    `/api/auth/me/recommendations/artwork?limit=${limit}`,
+    {
+      headers: {
+        Authorization: `Bearer ${token}`,
+      },
+    },
+  )
+
+  return response.artwork
+}
+
 // Update the current user profile and return the refreshed auth payload.
 export async function updateCurrentUser(
   token: string,

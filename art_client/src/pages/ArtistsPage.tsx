@@ -834,7 +834,7 @@ function ArtistsPage({ authToken, authUser, onAuthUserUpdate }: ArtistsPageProps
     <section className="collection-page">
       <div className="collection-header">
         <div>
-          <h1 className="page-title">Artists</h1>
+          <h1 className="page-title collection-main-title">Artists</h1>
           <p className="page-subtitle">
             Showing {visibleArtists.length} out of {filteredArtists.length} artists
           </p>

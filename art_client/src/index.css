@@ -454,7 +454,7 @@ body {
   z-index: 0;
   border: 1px solid #000000;
   padding: 12px;
-  padding-bottom: 48px;
+  padding-bottom: 56px;
   background: #ffffff;
   cursor: pointer;
   transition: transform 0.18s ease, box-shadow 0.18s ease;
@@ -507,6 +507,11 @@ body {
   font-size: 40px;
 }
 
+.collection-main-title {
+  font-size: 40px;
+  line-height: 1;
+}
+
 .collection-page .page-subtitle {
   font-size: 21px;
 }
@@ -539,9 +544,9 @@ body {
   border: 1px solid #000000;
   background: #ffffff;
   color: #000000;
-  width: 34px;
-  height: 34px;
-  font-size: 19px;
+  width: 42px;
+  height: 42px;
+  font-size: 24px;
   font-weight: 700;
   line-height: 1;
   cursor: pointer;
@@ -722,7 +727,7 @@ body {
 
 .modal-section-with-like {
   position: relative;
-  padding-bottom: 56px;
+  padding-bottom: 64px;
 }
 
 .modal-section-like-btn {
@@ -732,9 +737,9 @@ body {
   border: 1px solid #000000;
   background: #ffffff;
   color: #000000;
-  width: 34px;
-  height: 34px;
-  font-size: 19px;
+  width: 42px;
+  height: 42px;
+  font-size: 24px;
   font-weight: 700;
   line-height: 1;
   cursor: pointer;
@@ -989,14 +994,17 @@ body {
   align-items: center;
 }
 
-.home-hero-media,
-.home-about-teaser {
+.home-hero-media {
   border: 1px solid #000000;
   background: #ffffff;
 }
 
 .home-hero-media {
   overflow: hidden;
+}
+
+.home-about-teaser {
+  background: #ffffff;
 }
 
 .home-hero-image {
@@ -1020,6 +1028,22 @@ body {
   font-weight: 800;
   text-transform: uppercase;
   letter-spacing: 0.08em;
+}
+
+.home-about-kicker {
+  font-size: 42px;
+  font-weight: 700;
+  line-height: 1;
+  letter-spacing: 0;
+  text-transform: none;
+}
+
+.about-kicker {
+  font-size: 64px;
+  font-weight: 700;
+  line-height: 1;
+  letter-spacing: 0;
+  text-transform: none;
 }
 
 .home-hero-title {
@@ -1065,6 +1089,12 @@ body {
   margin-bottom: 0;
 }
 
+.home-about-title,
+.about-title {
+  font-size: 14px;
+  line-height: 1.45;
+}
+
 .home-section-subtitle,
 .about-subtitle {
   margin: 0;
@@ -1081,6 +1111,8 @@ body {
 .home-section-footer {
   display: flex;
   justify-content: flex-end;
+  flex-wrap: wrap;
+  gap: 12px;
 }
 
 .home-carousel-controls {
@@ -1129,6 +1161,8 @@ body {
 
 .home-about-teaser {
   padding: 24px;
+
+  gap: 10px;
   align-items: stretch;
 }
 
@@ -1144,10 +1178,27 @@ body {
   gap: 12px;
 }
 
-.about-grid {
+.about-sections {
+  display: flex;
+  flex-direction: column;
+  gap: 28px;
+}
+
+.about-section-row {
   display: grid;
   grid-template-columns: repeat(2, minmax(0, 1fr));
-  gap: 18px;
+  padding: 24px 0;
+}
+
+.about-section-row-left .about-section-content {
+  grid-column: 1;
+  max-width: 520px;
+}
+
+.about-section-row-right .about-section-content {
+  grid-column: 2;
+  max-width: 520px;
+  justify-self: end;
 }
 
 .about-page .modal-section-title {
@@ -1159,8 +1210,14 @@ body {
   line-height: 1.6;
 }
 
+.about-section-title {
+  margin-bottom: 12px;
+}
+
 .about-body-text {
   margin: 0;
+  padding-top: 0;
+  border-top: 0;
 }
 
 .auth-page .page-title,
@@ -1671,6 +1728,23 @@ body {
     font-size: 34px;
   }
 
+  .collection-main-title {
+    font-size: 40px;
+  }
+
+  .home-about-kicker {
+    font-size: 34px;
+  }
+
+  .about-kicker {
+    font-size: 48px;
+  }
+
+  .home-about-title,
+  .about-title {
+    font-size: 14px;
+  }
+
   .site-footer {
     margin-top: 56px;
     padding-top: 20px;
@@ -1697,8 +1771,15 @@ body {
 
   .home-hero,
   .home-about-teaser,
-  .about-grid {
+  .about-section-row {
     grid-template-columns: 1fr;
+  }
+
+  .about-section-row-left .about-section-content,
+  .about-section-row-right .about-section-content {
+    grid-column: 1;
+    max-width: none;
+    justify-self: stretch;
   }
 
   .home-hero-image {

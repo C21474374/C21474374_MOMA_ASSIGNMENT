@@ -1,6 +1,7 @@
 const bcrypt = require("bcryptjs");
 const mongoose = require("mongoose");
 const { signAuthToken } = require("../../utils/authToken");
+const parseLimit = require("../../utils/parseLimit");
 const {
   getUsersCollection,
   isValidEmail,
@@ -37,6 +38,49 @@ function parseLikedRecordId(id) {
   }
 
   return id.trim();
+}
+
+// Access the artwork collection from the shared MongoDB connection.
+function getArtworkCollection() {
+  if (!mongoose.connection.db) {
+    throw new Error("Database connection is not ready.");
+  }
+
+  return mongoose.connection.db.collection("artwork");
+}
+
+// Access the artists collection from the shared MongoDB connection.
+function getArtistsCollection() {
+  if (!mongoose.connection.db) {
+    throw new Error("Database connection is not ready.");
+  }
+
+  return mongoose.connection.db.collection("artists");
+}
+
+// Normalize string or string-array values before adding them to a query value set.
+function addNormalizedStringValues(targetSet, value) {
+  if (Array.isArray(value)) {
+    value.forEach((entry) => addNormalizedStringValues(targetSet, entry));
+    return;
+  }
+
+  if (typeof value !== "string") {
+    return;
+  }
+
+  const trimmedValue = value.trim();
+  if (trimmedValue) {
+    targetSet.add(trimmedValue);
+  }
+}
+
+// Safely add a numeric record value when it exists.
+function addFiniteNumberValue(targetSet, value) {
+  const parsedValue = Number(value);
+  if (Number.isFinite(parsedValue)) {
+    targetSet.add(parsedValue);
+  }
 }
 
 // Return the safe current user payload after profile and like changes.
@@ -147,6 +191,129 @@ async function getCurrentUser(req, res) {
   } catch (error) {
     console.error("Failed to fetch current user:", error.message);
     return res.status(500).json({ error: "Failed to fetch current user" });
+  }
+}
+
+// Return small artwork recommendations based on the current user's saved likes.
+async function getCurrentUserArtworkRecommendations(req, res) {
+  try {
+    const usersCollection = getUsersCollection();
+    const artworkCollection = getArtworkCollection();
+    const artistsCollection = getArtistsCollection();
+    const userId = getAuthenticatedUserId(req);
+    if (!userId) {
+      return res.status(401).json({ error: "Invalid authorization token" });
+    }
+
+    const user = await usersCollection.findOne({ _id: userId });
+    if (!user) {
+      return res.status(404).json({ error: "User not found" });
+    }
+
+    const likedArtworkIds = (Array.isArray(user.likedArtworkIds)
+      ? user.likedArtworkIds
+      : []
+    ).map(parseLikedRecordId).filter(Boolean);
+    const likedArtistIds = (Array.isArray(user.likedArtistIds)
+      ? user.likedArtistIds
+      : []
+    ).map(parseLikedRecordId).filter(Boolean);
+
+    if (likedArtworkIds.length === 0 && likedArtistIds.length === 0) {
+      return res.json({ artwork: [] });
+    }
+
+    const likedArtworkObjectIds = likedArtworkIds.map(
+      (id) => new mongoose.Types.ObjectId(id)
+    );
+    const likedArtistObjectIds = likedArtistIds.map(
+      (id) => new mongoose.Types.ObjectId(id)
+    );
+
+    const [likedArtwork, likedArtists] = await Promise.all([
+      likedArtworkObjectIds.length > 0
+        ? artworkCollection
+            .find(
+              { _id: { $in: likedArtworkObjectIds } },
+              {
+                projection: {
+                  Artist: 1,
+                  Classification: 1,
+                  Department: 1,
+                },
+              }
+            )
+            .toArray()
+        : [],
+      likedArtistObjectIds.length > 0
+        ? artistsCollection
+            .find(
+              { _id: { $in: likedArtistObjectIds } },
+              {
+                projection: {
+                  DisplayName: 1,
+                  ConstituentID: 1,
+                },
+              }
+            )
+            .toArray()
+        : [],
+    ]);
+
+    const artistNames = new Set();
+    const classifications = new Set();
+    const departments = new Set();
+    const constituentIds = new Set();
+
+    likedArtists.forEach((artist) => {
+      addNormalizedStringValues(artistNames, artist.DisplayName);
+      addFiniteNumberValue(constituentIds, artist.ConstituentID);
+    });
+
+    likedArtwork.forEach((artworkItem) => {
+      addNormalizedStringValues(artistNames, artworkItem.Artist);
+      addNormalizedStringValues(classifications, artworkItem.Classification);
+      addNormalizedStringValues(departments, artworkItem.Department);
+    });
+
+    const recommendationFilters = [];
+    if (artistNames.size > 0) {
+      recommendationFilters.push({ Artist: { $in: Array.from(artistNames) } });
+    }
+    if (classifications.size > 0) {
+      recommendationFilters.push({
+        Classification: { $in: Array.from(classifications) },
+      });
+    }
+    if (departments.size > 0) {
+      recommendationFilters.push({ Department: { $in: Array.from(departments) } });
+    }
+    if (constituentIds.size > 0) {
+      recommendationFilters.push({
+        ConstituentID: { $in: Array.from(constituentIds) },
+      });
+    }
+
+    if (recommendationFilters.length === 0) {
+      return res.json({ artwork: [] });
+    }
+
+    const limit = parseLimit(req.query.limit, 12, 24);
+    const recommendedArtwork = await artworkCollection
+      .find({
+        _id: { $nin: likedArtworkObjectIds },
+        $or: recommendationFilters,
+      })
+      .sort({ Likes: -1, _id: 1 })
+      .limit(limit)
+      .toArray();
+
+    return res.json({ artwork: recommendedArtwork });
+  } catch (error) {
+    console.error("Failed to fetch artwork recommendations:", error.message);
+    return res
+      .status(500)
+      .json({ error: "Failed to fetch artwork recommendations" });
   }
 }
 
@@ -331,6 +498,7 @@ async function unlikeArtwork(req, res) {
 module.exports = {
   deleteCurrentUser,
   getCurrentUser,
+  getCurrentUserArtworkRecommendations,
   likeArtist,
   likeArtwork,
   login,

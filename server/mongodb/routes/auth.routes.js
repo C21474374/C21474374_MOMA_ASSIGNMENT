@@ -2,6 +2,7 @@ const express = require("express");
 const {
   deleteCurrentUser,
   getCurrentUser,
+  getCurrentUserArtworkRecommendations,
   likeArtist,
   likeArtwork,
   login,
@@ -20,6 +21,12 @@ router.post("/register", register);
 router.post("/login", login);
 // Return the currently authenticated user.
 router.get("/me", requireAuth, getCurrentUser);
+// Return lightweight artwork recommendations based on the current user's likes.
+router.get(
+  "/me/recommendations/artwork",
+  requireAuth,
+  getCurrentUserArtworkRecommendations
+);
 // Update account fields for the current user and return a refreshed auth payload.
 router.put("/me", requireAuth, updateCurrentUser);
 // Delete the currently authenticated user account.

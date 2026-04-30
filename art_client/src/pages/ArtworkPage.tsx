@@ -612,7 +612,7 @@ function ArtworkPage({ authToken, authUser, onAuthUserUpdate }: ArtworkPageProps
     <section className="collection-page">
       <div className="collection-header">
         <div>
-          <h1 className="page-title">Artwork</h1>
+          <h1 className="page-title collection-main-title">Artwork</h1>
           <p className="page-subtitle">
             Showing {visibleArtwork.length} out of {filteredArtwork.length} artworks
           </p>
