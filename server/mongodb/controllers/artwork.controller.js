@@ -1,5 +1,4 @@
 const mongoose = require("mongoose");
-const parseLimit = require("../../utils/parseLimit");
 
 // Access the artwork collection once the shared MongoDB connection is ready.
 function getArtworkCollection() {
@@ -19,12 +18,11 @@ function parseObjectId(id) {
   return new mongoose.Types.ObjectId(id);
 }
 
-// Read artwork list (limited) for gallery/list views.
+// Read the full artwork list for gallery/list views; the frontend paginates it.
 async function getAllArtwork(req, res) {
   try {
     const artworkCollection = getArtworkCollection();
-    const limit = parseLimit(req.query.limit);
-    const artwork = await artworkCollection.find({}).limit(limit).toArray();
+    const artwork = await artworkCollection.find({}).toArray();
     res.json(artwork);
   } catch (error) {
     console.error("Failed to fetch artwork:", error.message);

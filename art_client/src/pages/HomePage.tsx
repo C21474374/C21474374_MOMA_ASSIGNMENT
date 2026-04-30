@@ -18,6 +18,7 @@ import {
 } from '../utils/auth'
 
 const RECOMMENDATION_LIMIT = 12
+const HIGHLIGHTED_ARTWORK_LIMIT = 12
 
 type ArtworkSummary = {
   _id: string
@@ -50,14 +51,17 @@ type HomePageProps = {
   onAuthUserUpdate: (user: AuthUser) => void
 }
 
-// Render the homepage hero, a single recommendation carousel, and the shared artwork detail modal.
+// Render the homepage hero, a personalized or highlighted artwork carousel, and the shared artwork detail modal.
 function HomePage({ authToken, authUser, onAuthUserUpdate }: HomePageProps) {
   const [recommendedArtwork, setRecommendedArtwork] = useState<ArtworkSummary[]>([])
+  const [highlightedArtwork, setHighlightedArtwork] = useState<ArtworkSummary[]>([])
   const [likedArtworkIds, setLikedArtworkIds] = useState<Set<string>>(new Set())
   const [selectedArtwork, setSelectedArtwork] = useState<ArtworkSummary | null>(null)
   const [artworkDetailsLoading, setArtworkDetailsLoading] = useState(false)
   const [recommendationsLoading, setRecommendationsLoading] = useState(false)
   const [recommendationsError, setRecommendationsError] = useState('')
+  const [highlightedLoading, setHighlightedLoading] = useState(false)
+  const [highlightedError, setHighlightedError] = useState('')
 
   useEffect(() => {
     if (!authUser) {
@@ -125,12 +129,73 @@ function HomePage({ authToken, authUser, onAuthUserUpdate }: HomePageProps) {
     }
   }, [authToken, authUser])
 
-  // Keep recommendation cards and the open artwork modal in sync after likes or detail loads.
-  const updateRecommendedArtworkState = (
+  useEffect(() => {
+    let isMounted = true
+
+    // Load a browsable highlighted set for logged-out visitors.
+    const loadHighlightedArtwork = async () => {
+      if (authUser) {
+        setHighlightedArtwork([])
+        setHighlightedError('')
+        setHighlightedLoading(false)
+        return
+      }
+
+      try {
+        setHighlightedLoading(true)
+        const response = await fetch('/api/artwork')
+        if (!response.ok) {
+          throw new Error(`Request failed with status ${response.status}`)
+        }
+
+        const artwork = (await response.json()) as ArtworkSummary[]
+        const highlightedItems = [...artwork]
+          .sort((first, second) => {
+            const likeDifference = Number(second.Likes ?? 0) - Number(first.Likes ?? 0)
+            if (likeDifference !== 0) {
+              return likeDifference
+            }
+
+            return String(first.Title || '').localeCompare(String(second.Title || ''))
+          })
+          .slice(0, HIGHLIGHTED_ARTWORK_LIMIT)
+
+        if (isMounted) {
+          setHighlightedArtwork(highlightedItems)
+          setHighlightedError('')
+        }
+      } catch (requestError) {
+        if (isMounted) {
+          setHighlightedArtwork([])
+          setHighlightedError(
+            requestError instanceof Error
+              ? requestError.message
+              : 'Failed to load highlighted artwork',
+          )
+        }
+      } finally {
+        if (isMounted) {
+          setHighlightedLoading(false)
+        }
+      }
+    }
+
+    loadHighlightedArtwork()
+
+    return () => {
+      isMounted = false
+    }
+  }, [authUser])
+
+  // Keep homepage carousel cards and the open artwork modal in sync after likes or detail loads.
+  const updateHomepageArtworkState = (
     artworkId: string,
     changes: Partial<ArtworkSummary>,
   ) => {
     setRecommendedArtwork((prev) =>
+      prev.map((item) => (item._id === artworkId ? { ...item, ...changes } : item)),
+    )
+    setHighlightedArtwork((prev) =>
       prev.map((item) => (item._id === artworkId ? { ...item, ...changes } : item)),
     )
     setSelectedArtwork((prev) =>
@@ -166,7 +231,7 @@ function HomePage({ authToken, authUser, onAuthUserUpdate }: HomePageProps) {
       }
 
       const detailedArtwork = (await response.json()) as ArtworkSummary
-      updateRecommendedArtworkState(item._id, detailedArtwork)
+      updateHomepageArtworkState(item._id, detailedArtwork)
       setSelectedArtwork(detailedArtwork)
     } catch {
       setSelectedArtwork(item)
@@ -207,7 +272,7 @@ function HomePage({ authToken, authUser, onAuthUserUpdate }: HomePageProps) {
         prev && prev._id === item._id ? { ...prev, Likes: nextLikes } : prev,
       )
     } else {
-      updateRecommendedArtworkState(item._id, { Likes: nextLikes })
+      updateHomepageArtworkState(item._id, { Likes: nextLikes })
     }
 
     let syncedAccountLike = false
@@ -239,7 +304,7 @@ function HomePage({ authToken, authUser, onAuthUserUpdate }: HomePageProps) {
           prev && prev._id === item._id ? updatedArtwork : prev,
         )
       } else {
-        updateRecommendedArtworkState(item._id, updatedArtwork)
+        updateHomepageArtworkState(item._id, updatedArtwork)
       }
     } catch {
       if (syncedAccountLike && authToken && authUser) {
@@ -285,6 +350,41 @@ function HomePage({ authToken, authUser, onAuthUserUpdate }: HomePageProps) {
   const isSelectedArtworkLiked = selectedArtwork
     ? likedArtworkIds.has(selectedArtwork._id)
     : false
+  const isShowingRecommendations = Boolean(authUser)
+  const hasRecommendationSeedLikes = Boolean(
+    authUser &&
+      (authUser.likedArtistIds.length > 0 || authUser.likedArtworkIds.length > 0),
+  )
+  const carouselArtwork = isShowingRecommendations
+    ? recommendedArtwork
+    : highlightedArtwork
+  const carouselTitle = isShowingRecommendations
+    ? 'Recommended For You'
+    : 'Highlighted Artworks'
+  const carouselSubtitle = isShowingRecommendations
+    ? 'Artwork matched from the artists and pieces you have already liked.'
+    : 'Popular pieces from the collection to help you start exploring.'
+  const carouselStatus = !isShowingRecommendations ? (
+    highlightedLoading ? (
+      <p className="status-text">Loading highlighted artwork...</p>
+    ) : highlightedError ? (
+      <p className="status-text">Error: {highlightedError}</p>
+    ) : highlightedArtwork.length === 0 ? (
+      <p className="status-text">No highlighted artwork available right now.</p>
+    ) : undefined
+  ) : recommendationsLoading ? (
+    <p className="status-text">Loading recommendations...</p>
+  ) : recommendationsError ? (
+    <p className="status-text">Error: {recommendationsError}</p>
+  ) : !hasRecommendationSeedLikes ? (
+    <p className="status-text">
+      Like some artists or artwork to unlock recommendations.
+    </p>
+  ) : recommendedArtwork.length === 0 ? (
+    <p className="status-text">
+      No recommendations yet. Try liking a few more items.
+    </p>
+  ) : undefined
 
   return (
     <section className="home-page">
@@ -315,31 +415,12 @@ function HomePage({ authToken, authUser, onAuthUserUpdate }: HomePageProps) {
       </section>
 
       <CollectionCarouselSection
-        title="Recommended For You"
-        subtitle="Artwork matched from the artists and pieces you have already liked."
-        hasItems={recommendedArtwork.length > 0}
-        status={
-          !authUser ? (
-            <p className="status-text">
-              Sign in to unlock personalized artwork recommendations.
-            </p>
-          ) : recommendationsLoading ? (
-            <p className="status-text">Loading recommendations...</p>
-          ) : recommendationsError ? (
-            <p className="status-text">Error: {recommendationsError}</p>
-          ) : authUser.likedArtistIds.length === 0 &&
-            authUser.likedArtworkIds.length === 0 ? (
-            <p className="status-text">
-              Like some artists or artwork to unlock recommendations.
-            </p>
-          ) : recommendedArtwork.length === 0 ? (
-            <p className="status-text">
-              No recommendations yet. Try liking a few more items.
-            </p>
-          ) : undefined
-        }
+        title={carouselTitle}
+        subtitle={carouselSubtitle}
+        hasItems={carouselArtwork.length > 0}
+        status={carouselStatus}
       >
-        {recommendedArtwork.map((item) => {
+        {carouselArtwork.map((item) => {
           const isLiked = likedArtworkIds.has(item._id)
           const likeActionLabel = authUser
             ? `${isLiked ? 'Unlike' : 'Like'} ${item.Title || 'artwork'}`
@@ -371,18 +452,17 @@ function HomePage({ authToken, authUser, onAuthUserUpdate }: HomePageProps) {
 
       <section className="home-about-teaser">
         <div className="home-about-copy">
-          <p className="home-section-kicker home-about-kicker">About The Museum</p>
+          <p className="home-section-kicker home-about-kicker">About This Page</p>
           <p className="page-subtitle home-section-subtitle">
-            This project brings MoMA-inspired browsing together in one place,
-            combining collection discovery, artist context, and personal account
-            features in a clean interface. From major works to artist biographies,
-            the goal is to make the museum feel less like a database and more like
-            a guided visit through modern and contemporary art.
+            The technical write-up explains how the React frontend, Express backend,
+            and MongoDB database work together. It also covers the technology choices,
+            current limitations, and alternative approaches that could be used to build
+            the same application in a different way.
           </p>
         </div>
         <div className="home-about-actions">
           <a href="#/about" className="show-more-btn home-section-btn">
-            Read More
+            About this page
           </a>
         </div>
       </section>

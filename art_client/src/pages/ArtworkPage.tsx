@@ -232,6 +232,7 @@ function ArtworkPage({ authToken, authUser, onAuthUserUpdate }: ArtworkPageProps
   )
   const [artworkEditorError, setArtworkEditorError] = useState('')
   const [artworkEditorSubmitting, setArtworkEditorSubmitting] = useState(false)
+  const [saveFeedback, setSaveFeedback] = useState('')
 
   useEffect(() => {
     let isMounted = true
@@ -240,7 +241,7 @@ function ArtworkPage({ authToken, authUser, onAuthUserUpdate }: ArtworkPageProps
     const loadArtwork = async () => {
       try {
         setLoading(true)
-        const response = await fetch('/api/artwork?limit=200')
+        const response = await fetch('/api/artwork')
         if (!response.ok) {
           throw new Error(`Request failed with status ${response.status}`)
         }
@@ -272,6 +273,20 @@ function ArtworkPage({ authToken, authUser, onAuthUserUpdate }: ArtworkPageProps
       isMounted = false
     }
   }, [])
+
+  useEffect(() => {
+    if (!saveFeedback) {
+      return undefined
+    }
+
+    const timeoutId = window.setTimeout(() => {
+      setSaveFeedback('')
+    }, 3200)
+
+    return () => {
+      window.clearTimeout(timeoutId)
+    }
+  }, [saveFeedback])
 
   useEffect(() => {
     setVisibleCount(PAGE_SIZE)
@@ -427,6 +442,9 @@ function ArtworkPage({ authToken, authUser, onAuthUserUpdate }: ArtworkPageProps
         )
       }
 
+      setSaveFeedback(
+        isCreate ? 'Artwork created successfully.' : 'Artwork changes saved successfully.'
+      )
       closeArtworkEditor()
     } catch (submitError) {
       setArtworkEditorError(
@@ -610,6 +628,11 @@ function ArtworkPage({ authToken, authUser, onAuthUserUpdate }: ArtworkPageProps
 
   return (
     <section className="collection-page">
+      {saveFeedback ? (
+        <p className="collection-feedback-toast" role="status" aria-live="polite">
+          {saveFeedback}
+        </p>
+      ) : null}
       <div className="collection-header">
         <div>
           <h1 className="page-title collection-main-title">Artwork</h1>

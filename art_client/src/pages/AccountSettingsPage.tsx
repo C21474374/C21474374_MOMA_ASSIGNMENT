@@ -21,7 +21,6 @@ import {
   updateCurrentUser,
 } from '../utils/auth'
 
-const RELATED_ARTWORK_LIMIT = 200
 const CAROUSEL_PAGE_SIZE = 3
 
 type LikedArtist = {
@@ -326,7 +325,7 @@ function AccountSettingsPage({
     }
 
     try {
-      const response = await fetch(`/api/artwork?limit=${RELATED_ARTWORK_LIMIT}`)
+      const response = await fetch('/api/artwork')
       if (!response.ok) {
         throw new Error(`Request failed with status ${response.status}`)
       }

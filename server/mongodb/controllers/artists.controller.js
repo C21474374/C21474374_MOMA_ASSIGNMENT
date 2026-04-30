@@ -1,5 +1,4 @@
 const mongoose = require("mongoose");
-const parseLimit = require("../../utils/parseLimit");
 
 // Access the artists collection once the shared MongoDB connection is ready.
 function getArtistsCollection() {
@@ -19,12 +18,11 @@ function parseObjectId(id) {
   return new mongoose.Types.ObjectId(id);
 }
 
-// Read all artists (limited) for listing views.
+// Read the full artists list for listing views; the frontend paginates it.
 async function getAllArtists(req, res) {
   try {
     const artistsCollection = getArtistsCollection();
-    const limit = parseLimit(req.query.limit);
-    const artists = await artistsCollection.find({}).limit(limit).toArray();
+    const artists = await artistsCollection.find({}).toArray();
     res.json(artists);
   } catch (error) {
     console.error("Failed to fetch artists:", error.message);

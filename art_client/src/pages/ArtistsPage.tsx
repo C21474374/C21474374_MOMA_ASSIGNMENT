@@ -272,6 +272,7 @@ function ArtistsPage({ authToken, authUser, onAuthUserUpdate }: ArtistsPageProps
   )
   const [artistEditorError, setArtistEditorError] = useState('')
   const [artistEditorSubmitting, setArtistEditorSubmitting] = useState(false)
+  const [saveFeedback, setSaveFeedback] = useState('')
 
   useEffect(() => {
     let isMounted = true
@@ -280,7 +281,7 @@ function ArtistsPage({ authToken, authUser, onAuthUserUpdate }: ArtistsPageProps
     const loadArtists = async () => {
       try {
         setLoading(true)
-        const response = await fetch('/api/artists?limit=200')
+        const response = await fetch('/api/artists')
         if (!response.ok) {
           throw new Error(`Request failed with status ${response.status}`)
         }
@@ -312,6 +313,20 @@ function ArtistsPage({ authToken, authUser, onAuthUserUpdate }: ArtistsPageProps
       isMounted = false
     }
   }, [])
+
+  useEffect(() => {
+    if (!saveFeedback) {
+      return undefined
+    }
+
+    const timeoutId = window.setTimeout(() => {
+      setSaveFeedback('')
+    }, 3200)
+
+    return () => {
+      window.clearTimeout(timeoutId)
+    }
+  }, [saveFeedback])
 
   useEffect(() => {
     setVisibleCount(PAGE_SIZE)
@@ -461,6 +476,9 @@ function ArtistsPage({ authToken, authUser, onAuthUserUpdate }: ArtistsPageProps
         )
       }
 
+      setSaveFeedback(
+        isCreate ? 'Artist created successfully.' : 'Artist changes saved successfully.'
+      )
       closeArtistEditor()
     } catch (submitError) {
       setArtistEditorError(
@@ -532,7 +550,7 @@ function ArtistsPage({ authToken, authUser, onAuthUserUpdate }: ArtistsPageProps
     }
 
     try {
-      const response = await fetch('/api/artwork?limit=200')
+      const response = await fetch('/api/artwork')
       if (!response.ok) {
         throw new Error(`Request failed with status ${response.status}`)
       }
@@ -832,6 +850,11 @@ function ArtistsPage({ authToken, authUser, onAuthUserUpdate }: ArtistsPageProps
 
   return (
     <section className="collection-page">
+      {saveFeedback ? (
+        <p className="collection-feedback-toast" role="status" aria-live="polite">
+          {saveFeedback}
+        </p>
+      ) : null}
       <div className="collection-header">
         <div>
           <h1 className="page-title collection-main-title">Artists</h1>
